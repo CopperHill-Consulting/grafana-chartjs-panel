@@ -1,0 +1,87 @@
+<div class="section gf-form-group">
+  <h5>Chart Properties</h5>
+  <div class="gf-form">
+    <span class="gf-form-label width-auto">Chart Type</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input" ng-model="ctrl.panel.chartType" ng-options="ct.value as ct.text for ct in ctrl.CHART_TYPES"
+        ng-change="ctrl.renderNow()"></select>
+    </div>
+  </div>
+  <div class="gf-form">
+    <span class="gf-form-label width-auto">Category Column</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input" ng-model="ctrl.panel.categoryColumnName" ng-options="ct for ct in ctrl.data.columnTexts" ng-change="ctrl.renderNow()"></select>
+    </div>
+  </div>
+  <div class="gf-form">
+    <span class="gf-form-label width-auto">Series Column</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input" ng-model="ctrl.panel.seriesColumnName" ng-options="ct as (ct === null ? '--- NONE ---' : ct) for ct in [null].concat(ctrl.data.columnTexts)" ng-change="ctrl.renderNow()"></select>
+    </div>
+  </div>
+  <div class="gf-form">
+    <span class="gf-form-label width-auto">Measure Column</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input" ng-model="ctrl.panel.measureColumnName" ng-options="ct for ct in ctrl.data.columnTexts" ng-change="ctrl.renderNow()"></select>
+    </div>
+  </div>
+  <div class="gf-form">
+    <gf-form-switch class="gf-form" label="Is Stacked" label-class="width-auto" checked="ctrl.panel.isStacked" on-change="ctrl.renderNow()"></gf-form-switch>
+  </div>
+</div>
+<div class="section gf-form-group">
+  <h5>Legend</h5>
+  <div class="gf-form">
+    <gf-form-switch class="gf-form" label="Is Showing" label-class="width-auto" checked="ctrl.panel.legend.isShowing" on-change="ctrl.renderNow()"></gf-form-switch>
+  </div>
+  <div ng-if="ctrl.panel.legend.isShowing">
+    <div class="gf-form">
+      <gf-form-switch class="gf-form" label="Is Full Width" label-class="width-auto" checked="ctrl.panel.legend.isFullWidth" on-change="ctrl.renderNow()"></gf-form-switch>
+    </div>
+    <div class="gf-form">
+      <gf-form-switch class="gf-form" label="Reverse" label-class="width-auto" checked="ctrl.panel.legend.isReverse" on-change="ctrl.renderNow()"></gf-form-switch>
+    </div>
+    <div class="gf-form">
+      <span class="gf-form-label width-auto">Position</span>
+      <div class="gf-form-select-wrapper width-auto">
+        <select class="gf-form-input" ng-model="ctrl.panel.legend.position" ng-options="t for t in ['top', 'left', 'right', 'bottom']" ng-change="ctrl.renderNow()"></select>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="section gf-form-group">
+  <h5>X-Axis</h5>
+  <div class="gf-form">
+    <gf-form-switch class="gf-form" label="Auto Skip Labels" label-class="width-auto" checked="ctrl.panel.scales.xAxes.ticks.autoSkip" on-change="ctrl.renderNow()"></gf-form-switch>
+  </div>
+  <div class="gf-form">
+    <span class="gf-form-label width-auto">Minimum Rotation</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input" ng-model="ctrl.panel.scales.xAxes.ticks.minRotation" ng-options="r.value as r.text for r in ctrl.TICK_ROTATIONS" ng-change="ctrl.renderNow()"></select>
+    </div>
+  </div>
+  <div class="gf-form">
+    <span class="gf-form-label width-auto">Maximum Rotation</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input" ng-model="ctrl.panel.scales.xAxes.ticks.maxRotation" ng-options="r.value as r.text for r in ctrl.TICK_ROTATIONS" ng-change="ctrl.renderNow()"></select>
+    </div>
+  </div>
+</div>
+<div class="section gf-form-group">
+  <h5>Y-Axis</h5>
+  <div class="gf-form">
+    <gf-form-switch class="gf-form" label="Auto Skip Labels" label-class="width-auto" checked="ctrl.panel.scales.yAxes.ticks.autoSkip" on-change="ctrl.renderNow()"></gf-form-switch>
+  </div>
+  <div class="gf-form">
+    <span class="gf-form-label width-auto">Minimum Rotation</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input" ng-model="ctrl.panel.scales.yAxes.ticks.minRotation" ng-options="r.value as r.text for r in ctrl.TICK_ROTATIONS" ng-change="ctrl.renderNow()"></select>
+    </div>
+  </div>
+  <div class="gf-form">
+    <span class="gf-form-label width-auto">Maximum Rotation</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input" ng-model="ctrl.panel.scales.yAxes.ticks.maxRotation" ng-options="r.value as r.text for r in ctrl.TICK_ROTATIONS" ng-change="ctrl.renderNow()"></select>
+    </div>
+  </div>
+</div>

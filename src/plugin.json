@@ -1,0 +1,28 @@
+{
+  "type": "panel",
+  "name": "CopperHill Chart Panel",
+  "id": "westc-chartjs-panel",
+
+  "info": {
+    "description": "Use Chart.js to add custom charts to Grafana.",
+    "author": {
+      "name": "westc",
+      "url": "https://github.com/westc/grafana-chartjs-panel.git"
+    },
+    "keywords": ["panel"],
+    "logos": {
+      "small": "img/groupedBarChart_logo_small.png",
+      "large": "img/groupedBarChart_logo_large.png"
+    },
+    "links": [
+      {"name": "Project site", "url": "https://github.com/westc/grafana-chartjs-panel.git"}
+    ],
+    "version": "0.0.1",
+    "updated": "2019-03-27"
+  },
+
+  "dependencies": {
+    "grafanaVersion": "4.6",
+    "plugins": [ ]
+  }
+}
