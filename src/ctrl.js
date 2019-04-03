@@ -2,6 +2,7 @@ import {MetricsPanelCtrl} from 'app/plugins/sdk';
 import _ from 'lodash';
 import JS from './external/YourJS.min';
 import * as Chart from './external/Chart.bundle.min';
+//import ChartDataLabels from './external/Chart.datalabels.plugin';
 import {Color} from './external/CWest-Color.min';
 
 const panelDefaults = {
@@ -116,6 +117,11 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
     type: panel.chartType,
     data: barChartData,
     options: {
+      // plugins: {
+      //   datalabels: {
+      //     display: 'auto'
+      //   }
+      // },
       responsive: true,
       legend: {
         display: panel.legend.isShowing,

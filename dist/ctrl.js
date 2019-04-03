@@ -166,6 +166,11 @@ function renderChart(_ref) {
     type: panel.chartType,
     data: barChartData,
     options: {
+      // plugins: {
+      //   datalabels: {
+      //     display: 'auto'
+      //   }
+      // },
       responsive: true,
       legend: {
         display: panel.legend.isShowing,

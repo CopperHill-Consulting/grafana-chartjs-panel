@@ -1,13 +1,13 @@
-## Eval Panel Plugin for Grafana
+## Chart.js Panel Plugin for Grafana
 
-Evaluate JavaScript using the dangerous `eval()` function so be extra careful with the code that you are writing.
+Create bar charts in Grafana using Chart.js.
 
 ## Installation
 
 clone this repository into your plugin directory
 
 ```
-git clone https://github.com/westc/grafana-eval-panel.git
+git clone https://github.com/CopperHill-Consulting/grafana-chartjs-panel.git
 sudo service grafana-server restart
 ```
 
