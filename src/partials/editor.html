@@ -66,6 +66,12 @@
       <select class="gf-form-input" ng-model="ctrl.panel.scales.xAxes.ticks.maxRotation" ng-options="r.value as r.text for r in ctrl.TICK_ROTATIONS" ng-change="ctrl.renderNow()"></select>
     </div>
   </div>
+  <div class="gf-form">
+    <span class="gf-form-label width-auto">Gridline Style</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input" ng-model="ctrl.panel.scales.xAxes.gridLineOpacity" ng-options="r.value as r.text for r in ctrl.GRID_LINE_OPACITIES" ng-change="ctrl.renderNow()"></select>
+    </div>
+  </div>
 </div>
 <div class="section gf-form-group">
   <h5>Y-Axis</h5>
@@ -82,6 +88,12 @@
     <span class="gf-form-label width-auto">Maximum Rotation</span>
     <div class="gf-form-select-wrapper width-auto">
       <select class="gf-form-input" ng-model="ctrl.panel.scales.yAxes.ticks.maxRotation" ng-options="r.value as r.text for r in ctrl.TICK_ROTATIONS" ng-change="ctrl.renderNow()"></select>
+    </div>
+  </div>
+  <div class="gf-form">
+    <span class="gf-form-label width-auto">Gridline Style</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input" ng-model="ctrl.panel.scales.yAxes.gridLineOpacity" ng-options="r.value as r.text for r in ctrl.GRID_LINE_OPACITIES" ng-change="ctrl.renderNow()"></select>
     </div>
   </div>
 </div>

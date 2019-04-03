@@ -27,14 +27,16 @@ const panelDefaults = {
         autoSkip: true,
         minRotation: 0,
         maxRotation: 90
-      }
+      },
+      gridLineOpacity: 0.15
     },
     yAxes: {
       ticks: {
         autoSkip: true,
         minRotation: 0,
         maxRotation: 90
-      }
+      },
+      gridLineOpacity: 0.15
     }
   }
 };
@@ -113,6 +115,8 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
     }))
   };
 
+  let isLightTheme = jQuery(document.body).hasClass('theme-light');
+
   let myChart = new Chart(canvas, {
     type: panel.chartType,
     data: barChartData,
@@ -127,7 +131,10 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
         display: panel.legend.isShowing,
         position: panel.legend.position,
         fullWidth: panel.legend.isFullWidth,
-        reverse: panel.legend.isReverse
+        reverse: panel.legend.isReverse,
+        labels: {
+          fontColor: isLightTheme ? '#333' : '#CCC'
+        }
       },
       scales: {
         xAxes: [
@@ -135,9 +142,14 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
             ticks: {
               autoSkip: panel.scales.xAxes.ticks.autoSkip,
               minRotation: panel.scales.xAxes.ticks.minRotation,
-              maxRotation: panel.scales.xAxes.ticks.maxRotation
+              maxRotation: panel.scales.xAxes.ticks.maxRotation,
+              fontColor: isLightTheme ? '#333' : '#CCC'
             },
-            stacked: true
+            stacked: true,//scales.xAxes.gridLineStyle
+            gridLines: {
+              display: !!panel.scales.xAxes.gridLineOpacity,
+              color: isLightTheme ? `rgba(0,0,0,${+panel.scales.xAxes.gridLineOpacity})` : `rgba(255,255,255,${+panel.scales.xAxes.gridLineOpacity})`
+            }
           }
         ],
         yAxes: [
@@ -145,9 +157,14 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
             ticks: {
               autoSkip: panel.scales.yAxes.ticks.autoSkip,
               minRotation: panel.scales.yAxes.ticks.minRotation,
-              maxRotation: panel.scales.yAxes.ticks.maxRotation
+              maxRotation: panel.scales.yAxes.ticks.maxRotation,
+              fontColor: isLightTheme ? '#333' : '#CCC'
             },
-            stacked: true
+            stacked: true,
+            gridLines: {
+              display: !!panel.scales.yAxes.gridLineOpacity,
+              color: isLightTheme ? `rgba(0,0,0,${+panel.scales.yAxes.gridLineOpacity})` : `rgba(255,255,255,${+panel.scales.yAxes.gridLineOpacity})`
+            }
           }
         ]
       },
@@ -261,6 +278,11 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   constructor($scope, $injector, $rootScope) {
     super($scope, $injector);
 
+    this.GRID_LINE_OPACITIES = [
+      { value: false, text: 'None' },
+      { value: 0.15, text: 'Light' },
+      { value: 0.65, text: 'Dark' }
+    ];
     this.CHART_TYPES = [
       { value: 'horizontalBar', text: 'Horizontal Bar' },
       { value: 'bar', text: 'Vertical Bar' }
@@ -275,7 +297,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     this.$rootScope = $rootScope;
     this.data = null;
 
-    _.defaults(this.panel, panelDefaults);
+    _.defaultsDeep(this.panel, panelDefaults);
 
     this.events.on('init-edit-mode', this.onInitEditMode.bind(this));
     this.events.on('data-received', this.onDataReceived.bind(this));

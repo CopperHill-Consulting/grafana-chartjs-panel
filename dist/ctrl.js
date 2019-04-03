@@ -69,14 +69,16 @@ var panelDefaults = {
         autoSkip: true,
         minRotation: 0,
         maxRotation: 90
-      }
+      },
+      gridLineOpacity: 0.15
     },
     yAxes: {
       ticks: {
         autoSkip: true,
         minRotation: 0,
         maxRotation: 90
-      }
+      },
+      gridLineOpacity: 0.15
     }
   }
 };
@@ -162,6 +164,7 @@ function renderChart(_ref) {
       };
     })
   };
+  var isLightTheme = jQuery(document.body).hasClass('theme-light');
   var myChart = new Chart(canvas, {
     type: panel.chartType,
     data: barChartData,
@@ -176,24 +179,38 @@ function renderChart(_ref) {
         display: panel.legend.isShowing,
         position: panel.legend.position,
         fullWidth: panel.legend.isFullWidth,
-        reverse: panel.legend.isReverse
+        reverse: panel.legend.isReverse,
+        labels: {
+          fontColor: isLightTheme ? '#333' : '#CCC'
+        }
       },
       scales: {
         xAxes: [{
           ticks: {
             autoSkip: panel.scales.xAxes.ticks.autoSkip,
             minRotation: panel.scales.xAxes.ticks.minRotation,
-            maxRotation: panel.scales.xAxes.ticks.maxRotation
+            maxRotation: panel.scales.xAxes.ticks.maxRotation,
+            fontColor: isLightTheme ? '#333' : '#CCC'
           },
-          stacked: true
+          stacked: true,
+          //scales.xAxes.gridLineStyle
+          gridLines: {
+            display: !!panel.scales.xAxes.gridLineOpacity,
+            color: isLightTheme ? "rgba(0,0,0,".concat(+panel.scales.xAxes.gridLineOpacity, ")") : "rgba(255,255,255,".concat(+panel.scales.xAxes.gridLineOpacity, ")")
+          }
         }],
         yAxes: [{
           ticks: {
             autoSkip: panel.scales.yAxes.ticks.autoSkip,
             minRotation: panel.scales.yAxes.ticks.minRotation,
-            maxRotation: panel.scales.yAxes.ticks.maxRotation
+            maxRotation: panel.scales.yAxes.ticks.maxRotation,
+            fontColor: isLightTheme ? '#333' : '#CCC'
           },
-          stacked: true
+          stacked: true,
+          gridLines: {
+            display: !!panel.scales.yAxes.gridLineOpacity,
+            color: isLightTheme ? "rgba(0,0,0,".concat(+panel.scales.yAxes.gridLineOpacity, ")") : "rgba(255,255,255,".concat(+panel.scales.yAxes.gridLineOpacity, ")")
+          }
         }]
       },
       onClick: function onClick(e) {
@@ -323,6 +340,16 @@ function (_MetricsPanelCtrl) {
     _classCallCheck(this, ChartJsPanelCtrl);
 
     _this = _possibleConstructorReturn(this, _getPrototypeOf(ChartJsPanelCtrl).call(this, $scope, $injector));
+    _this.GRID_LINE_OPACITIES = [{
+      value: false,
+      text: 'None'
+    }, {
+      value: 0.15,
+      text: 'Light'
+    }, {
+      value: 0.65,
+      text: 'Dark'
+    }];
     _this.CHART_TYPES = [{
       value: 'horizontalBar',
       text: 'Horizontal Bar'
@@ -345,7 +372,7 @@ function (_MetricsPanelCtrl) {
     _this.$rootScope = $rootScope;
     _this.data = null;
 
-    _lodash.default.defaults(_this.panel, panelDefaults);
+    _lodash.default.defaultsDeep(_this.panel, panelDefaults);
 
     _this.events.on('init-edit-mode', _this.onInitEditMode.bind(_assertThisInitialized(_this)));
 
