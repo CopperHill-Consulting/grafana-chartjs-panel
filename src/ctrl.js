@@ -145,7 +145,7 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
               maxRotation: panel.scales.xAxes.ticks.maxRotation,
               fontColor: isLightTheme ? '#333' : '#CCC'
             },
-            stacked: true,//scales.xAxes.gridLineStyle
+            stacked: true,
             gridLines: {
               display: !!panel.scales.xAxes.gridLineOpacity,
               color: isLightTheme ? `rgba(0,0,0,${+panel.scales.xAxes.gridLineOpacity})` : `rgba(255,255,255,${+panel.scales.xAxes.gridLineOpacity})`
@@ -175,7 +175,13 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
           let category = model.label;
           let series = model.datasetLabel;
 
-          panel.drilldownLinks.forEach(function (drilldownLink) {
+          panel.drilldownLinks.reduce(function (isDone, drilldownLink) {
+            // If a link has already been opened dont check the other links.
+            if (isDone) {
+              return isDone;
+            }
+
+            // Check this link to see if it matches...
             let url = drilldownLink.url;
             if (url) {
               let rgxCategory = parseRegExp(drilldownLink.category);
@@ -199,9 +205,10 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
                   }
                 );
                 window.open(url, drilldownLink.openInBlank ? '_blank' : '_self');
+                return true;
               }
             }
-          });
+          }, false);
         }
       }
     }

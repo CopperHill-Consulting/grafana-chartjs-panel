@@ -193,7 +193,6 @@ function renderChart(_ref) {
             fontColor: isLightTheme ? '#333' : '#CCC'
           },
           stacked: true,
-          //scales.xAxes.gridLineStyle
           gridLines: {
             display: !!panel.scales.xAxes.gridLineOpacity,
             color: isLightTheme ? "rgba(0,0,0,".concat(+panel.scales.xAxes.gridLineOpacity, ")") : "rgba(255,255,255,".concat(+panel.scales.xAxes.gridLineOpacity, ")")
@@ -220,7 +219,13 @@ function renderChart(_ref) {
         if (model) {
           var category = model.label;
           var _series = model.datasetLabel;
-          panel.drilldownLinks.forEach(function (drilldownLink) {
+          panel.drilldownLinks.reduce(function (isDone, drilldownLink) {
+            // If a link has already been opened dont check the other links.
+            if (isDone) {
+              return isDone;
+            } // Check this link to see if it matches...
+
+
             var url = drilldownLink.url;
 
             if (url) {
@@ -236,9 +241,10 @@ function renderChart(_ref) {
                   }).join('&') : encodeURIComponent(result.join(','));
                 });
                 window.open(url, drilldownLink.openInBlank ? '_blank' : '_self');
+                return true;
               }
             }
-          });
+          }, false);
         }
       }
     }
