@@ -2,7 +2,7 @@ import {MetricsPanelCtrl} from 'app/plugins/sdk';
 import _ from 'lodash';
 import JS from './external/YourJS.min';
 import * as Chart from './external/Chart.bundle.min';
-//import ChartDataLabels from './external/Chart.datalabels.plugin';
+import config from 'app/core/config';
 import {Color} from './external/CWest-Color.min';
 
 const panelDefaults = {
@@ -115,7 +115,7 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
     }))
   };
 
-  let isLightTheme = jQuery(document.body).hasClass('theme-light');
+  let isLightTheme = config.theme.type === 'light';
 
   let myChart = new Chart(canvas, {
     type: panel.chartType,

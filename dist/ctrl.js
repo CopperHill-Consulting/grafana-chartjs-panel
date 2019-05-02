@@ -13,6 +13,8 @@ var _YourJS = _interopRequireDefault(require("./external/YourJS.min"));
 
 var Chart = _interopRequireWildcard(require("./external/Chart.bundle.min"));
 
+var _config = _interopRequireDefault(require("app/core/config"));
+
 var _CWestColor = require("./external/CWest-Color.min");
 
 function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = Object.defineProperty && Object.getOwnPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : {}; if (desc.get || desc.set) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } } newObj.default = obj; return newObj; } }
@@ -164,7 +166,7 @@ function renderChart(_ref) {
       };
     })
   };
-  var isLightTheme = jQuery(document.body).hasClass('theme-light');
+  var isLightTheme = _config.default.theme.type === 'light';
   var myChart = new Chart(canvas, {
     type: panel.chartType,
     data: barChartData,
