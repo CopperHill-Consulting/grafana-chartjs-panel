@@ -19,6 +19,12 @@
       <select class="gf-form-input" ng-model="ctrl.panel.seriesColumnName" ng-options="ct as (ct === null ? '--- NONE ---' : ct) for ct in [null].concat(ctrl.data.columnTexts)" ng-change="ctrl.renderNow()"></select>
     </div>
   </div>
+  <div class="gf-form" ng-if="ctrl.panel.isStacked">
+    <span class="gf-form-label width-auto">Stack Column</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input" ng-model="ctrl.panel.stackColumnName" ng-options="ct as (ct === null ? '--- NONE ---' : ct) for ct in [null].concat(ctrl.data.columnTexts)" ng-change="ctrl.renderNow()"></select>
+    </div>
+  </div>
   <div class="gf-form">
     <span class="gf-form-label width-auto">Measure Column</span>
     <div class="gf-form-select-wrapper width-auto">

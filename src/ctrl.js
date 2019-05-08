@@ -8,6 +8,7 @@ import {Color} from './external/CWest-Color.min';
 const panelDefaults = {
   categoryColumnName: null,
   seriesColumnName: null,
+  stackColumnName: null,
   measureColumnName: null,
   chartType: 'bar',
   drilldownLinks: [],
@@ -42,6 +43,10 @@ const panelDefaults = {
 };
 
 function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts }, panel, variables}) {
+  if (!columnTexts) {
+    throw new Error('No source data has been specified.');
+  }
+
   if (dataType !== 'table') {
     throw new Error('Data type must be "table".');
   }
@@ -64,6 +69,13 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
     ? colIndexesByText[panel.seriesColumnName]
     : -1;
 
+  if (panel.stackColumnName != undefined && !_.has(colIndexesByText, panel.stackColumnName)) {
+    throw new Error('Invalid stack column.');
+  }
+  let stackIndex = panel.stackColumnName != undefined
+    ? colIndexesByText[panel.stackColumnName]
+    : -1;
+
   if (!_.has(colIndexesByText, panel.measureColumnName)) {
     throw new Error('Invalid measure column.');
   }
@@ -79,7 +91,17 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
   );
 
   let categories = [...new Set(rows.map(row => row[categoryIndex]))];
-  let series = [...new Set(rows.map(row => row[seriesIndex]))];
+  let { series, seriesStacks } = rows.reduce(
+    (carry, row) => {
+      let seriesName = row[seriesIndex];
+      if (!carry.series.includes(seriesName)) {
+        carry.series.push(seriesName);
+        carry.seriesStacks.push(row[stackIndex]);
+      }
+      return carry;
+    },
+    { series: [], seriesStacks: [] }
+  );
 
   let oldColors = panel.seriesColors.slice();
   let newColors = series.map((seriesName, index, series) => {
@@ -103,7 +125,7 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
       backgroundColor: Color(newColors[seriesNameIndex].color).a(panel.dataBgColorAlpha).rgba(),
       borderColor: Color(newColors[seriesNameIndex].color).a(panel.dataBorderColorAlpha).rgba(),
       borderWidth: 1,
-      stack: 'Stack ' + (panel.isStacked ? 0 : seriesNameIndex),
+      stack: panel.isStacked ? seriesStacks[seriesNameIndex] : seriesNameIndex,
       data: categories.map(category => {
         let sum = rows.reduce((sum, row) => {
           let isMatch = row[categoryIndex] === category
@@ -255,7 +277,7 @@ function renderNow(e, jElem) {
       elemContent = jContent[0],
       jCanvas = jQuery('<canvas>').appendTo(jContent);
   
-  if (data && data.rows.length) {
+  if (data && data.rows && data.rows.length) {
     if (data.type === 'table') {
       jCanvas.prop({ width: jContent.width(), height: jContent.height() });
       try {
@@ -341,7 +363,6 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     if (dataList && dataList.length) {
       let data = dataList[0];
       this.data = {
-        isReal: true,
         type: data.type,
         columns: data.columns,
         rows: data.rows,
@@ -349,17 +370,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       };
     }
     else {
-      this.data = {
-        isReal: false,
-        type: 'table',
-        columns: [{text: "Off"}, {text: "Down"}, {text: "Run"}, {text: "Idle"}],
-        rows: [
-          [ 15, 50, 0, 40 ],
-          [ 15, 5, 40, 15 ],
-          [ 15, 30, 40, 15 ],
-          [ 15, 30, 80, 15 ]
-        ]
-      };
+      this.data = {};
     }
 
     this.renderNow();
