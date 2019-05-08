@@ -13,6 +13,8 @@ var _YourJS = _interopRequireDefault(require("./external/YourJS.min"));
 
 var Chart = _interopRequireWildcard(require("./external/Chart.bundle.min"));
 
+var ChartDataLabels = _interopRequireWildcard(require("./external/Chart.datalabels.plugin"));
+
 var _config = _interopRequireDefault(require("app/core/config"));
 
 var _CWestColor = require("./external/CWest-Color.min");
@@ -193,12 +195,8 @@ function renderChart(_ref) {
   var myChart = new Chart(canvas, {
     type: panel.chartType,
     data: barChartData,
+    //plugins: [ChartDataLabels],
     options: {
-      // plugins: {
-      //   datalabels: {
-      //     display: 'auto'
-      //   }
-      // },
       responsive: true,
       legend: {
         display: panel.legend.isShowing,
@@ -495,8 +493,10 @@ function (_MetricsPanelCtrl) {
   }]);
 
   return ChartJsPanelCtrl;
-}(_sdk.MetricsPanelCtrl);
+}(_sdk.MetricsPanelCtrl); // Dont add ChartDataLabels unless user requests this.
+
 
 exports.ChartJsPanelCtrl = ChartJsPanelCtrl;
+Chart.plugins.unregister(ChartDataLabels);
 ChartJsPanelCtrl.templateUrl = 'partials/module.html';
 //# sourceMappingURL=ctrl.js.map

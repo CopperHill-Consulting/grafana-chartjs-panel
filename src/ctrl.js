@@ -2,6 +2,7 @@ import {MetricsPanelCtrl} from 'app/plugins/sdk';
 import _ from 'lodash';
 import JS from './external/YourJS.min';
 import * as Chart from './external/Chart.bundle.min';
+import * as ChartDataLabels from './external/Chart.datalabels.plugin';
 import config from 'app/core/config';
 import {Color} from './external/CWest-Color.min';
 
@@ -142,12 +143,8 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
   let myChart = new Chart(canvas, {
     type: panel.chartType,
     data: barChartData,
+    //plugins: [ChartDataLabels],
     options: {
-      // plugins: {
-      //   datalabels: {
-      //     display: 'auto'
-      //   }
-      // },
       responsive: true,
       legend: {
         display: panel.legend.isShowing,
@@ -392,5 +389,8 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     this.events.on('render', _.debounce(e => renderNow.call(this, e, elem), 250));
   }
 }
+
+// Dont add ChartDataLabels unless user requests this.
+Chart.plugins.unregister(ChartDataLabels);
 
 ChartJsPanelCtrl.templateUrl = 'partials/module.html';
