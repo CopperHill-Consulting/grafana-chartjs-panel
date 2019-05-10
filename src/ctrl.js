@@ -3,16 +3,23 @@ import _ from 'lodash';
 import JS from './external/YourJS.min';
 import * as Chart from './external/Chart.bundle.min';
 import * as ChartDataLabels from './external/Chart.datalabels.plugin';
+import './external/Chart.funnel';
 import config from 'app/core/config';
 import {Color} from './external/CWest-Color.min';
 
-const panelDefaults = {
+const PANEL_DEFAULTS = {
+  chartType: null
+};
+
+const BAR_DEFAULTS = {
+  orientation: 'vertical',
   categoryColumnName: null,
   seriesColumnName: null,
   stackColumnName: null,
   measureColumnName: null,
-  chartType: 'bar',
   drilldownLinks: [],
+  colorSource: 'auto',
+  colorColumnName: null,
   seriesColors: [],
   isStacked: false,
   dataBgColorAlpha: 0.75,
@@ -42,8 +49,35 @@ const panelDefaults = {
     }
   }
 };
+const BAR_OPTIONS = Object.keys(JS.flattenKeys(BAR_DEFAULTS, true));
 
-function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts }, panel, variables}) {
+const FUNNEL_DEFAULTS = {
+  hAlign: 'center',
+  sortOrder: 'asc',
+  categoryColumnName: null,
+  measureColumnName: null,
+  drilldownLinks: [],
+  colorSource: 'auto',
+  colorColumnName: null,
+  seriesColors: [],
+  dataBgColorAlpha: 0.75,
+  dataBorderColorAlpha: 1,
+  gap: 1,
+  legend: {
+    isShowing: true,
+    position: 'top',
+    isFullWidth: false,
+    isReverse: false
+  }
+};
+const FUNNEL_OPTIONS = Object.keys(JS.flattenKeys(FUNNEL_DEFAULTS, true));
+
+const OPTIONS_BY_TYPE = {
+  bar: BAR_OPTIONS,
+  funnel: FUNNEL_OPTIONS
+};
+
+function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts, colIndexesByText }, panel: fullPanel, variables}) {
   if (!columnTexts) {
     throw new Error('No source data has been specified.');
   }
@@ -52,11 +86,7 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
     throw new Error('Data type must be "table".');
   }
 
-  let colIndexesByText = columnTexts.reduceRight(
-    (indexes, colText, index) =>
-      Object.assign(indexes, { [colText]: index }),
-    {}
-  );
+  let panel = fullPanel.bar;
 
   if (!_.has(colIndexesByText, panel.categoryColumnName)) {
     throw new Error('Invalid category column.');
@@ -141,7 +171,7 @@ function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts
   let isLightTheme = config.theme.type === 'light';
 
   let myChart = new Chart(canvas, {
-    type: panel.chartType,
+    type: panel.orientation === 'horizontal' ? 'horizontalBar': 'bar',
     data: barChartData,
     //plugins: [ChartDataLabels],
     options: {
@@ -269,21 +299,23 @@ function renderNow(e, jElem) {
   let error,
       isValid = false,
       ctrl = this,
+      chartType = ctrl.panel.chartType,
       data = ctrl.data,
       jContent = jElem.find('.panel-content').css('position', 'relative').html(''),
       elemContent = jContent[0],
-      jCanvas = jQuery('<canvas>').appendTo(jContent);
+      jCanvas = jQuery('<canvas>').appendTo(jContent),
+      canvas = jCanvas[0];
   
   if (data && data.rows && data.rows.length) {
     if (data.type === 'table') {
       jCanvas.prop({ width: jContent.width(), height: jContent.height() });
       try {
-        renderChart({
-          canvas: jCanvas[0],
-          data,
-          panel: ctrl.panel,
-          variables: ctrl.templateSrv.variables
-        });
+        if ('bar' === chartType) {
+          ctrl.drawBarChart(canvas);
+        }
+        else if ('funnel' === chartType) {
+          ctrl.drawFunnelChart(canvas);
+        }
         isValid = true;
       }
       catch(e) {
@@ -309,9 +341,28 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       { value: 0.15, text: 'Light' },
       { value: 0.65, text: 'Dark' }
     ];
+    this.CHART_COLOR_SOURCES = [
+      { value: 'column', text: 'Column' },
+      { value: 'auto', text: 'Rainbow' },
+      { value: 'custom', text: 'User-defined' }
+    ];
     this.CHART_TYPES = [
-      { value: 'horizontalBar', text: 'Horizontal Bar' },
-      { value: 'bar', text: 'Vertical Bar' }
+      { value: null, 'text': '--- PICK ONE ---' },
+      { value: 'bar', text: 'Bar' },
+      { value: 'funnel', text: 'Funnel' }
+    ];
+    this.CHART_ORIENTATIONS = [
+      { value: 'horizontal', text: 'Horizontal (\u2194)' },
+      { value: 'vertical', text: 'Vertical (\u2195)' }
+    ];
+    this.CHART_H_ALIGNMENTS = [
+      { value: 'left', text: 'Left' },
+      { value: 'center', text: 'Center' },
+      { value: 'right', text: 'Right' }
+    ];
+    this.SORT_ORDERS = [
+      { value: 'asc', text: 'Ascending' },
+      { value: 'desc', text: 'Descending' }
     ];
     this.COLOR_ALPHAS = _.range(0, 101, 5).map(x => ({
       value: x / 100, text: `${x}%` + (x ? x === 100 ? ' (Solid)' : '' : ' (Invisible)')
@@ -323,7 +374,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     this.$rootScope = $rootScope;
     this.data = null;
 
-    _.defaultsDeep(this.panel, panelDefaults);
+    this.setPanelDefaults();
 
     this.events.on('init-edit-mode', this.onInitEditMode.bind(this));
     this.events.on('data-received', this.onDataReceived.bind(this));
@@ -331,17 +382,69 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     this.events.on('data-error', this.onDataError.bind(this));
   }
 
+  // Setup the appropriate defaults and make sure that any old bar chart data
+  // is migrated to the new structure.
+  setPanelDefaults() {
+    let panel = this.panel;
+    _.defaultsDeep(panel, PANEL_DEFAULTS);
+    switch (panel.chartType) {
+      case 'horizontalBar':
+        panel.chartType = 'bar';
+        panel.orientation = 'horizontal';
+      case 'bar':
+        if (!panel.bar) {
+          panel.bar = {};
+        }
+        _.defaultsDeep(panel.bar, BAR_DEFAULTS);
+        Object.keys(BAR_DEFAULTS).forEach(key => {
+          if (_.has(panel, key)) {
+            panel.bar[key] = panel[key];
+            delete panel[key];
+          }
+        });
+        break;
+
+      case 'funnel':
+        _.defaultsDeep(panel.funnel = panel.funnel || {}, FUNNEL_DEFAULTS);
+        break;
+    }
+  }
+
+  addSeriesColor(opt_index) {
+    let panel = this.panel;
+    let colors = panel[panel.chartType].seriesColors;
+    colors.splice(opt_index == null ? colors.length : opt_index, 0, Color('black') + '');
+    this.renderNow();
+  }
+
+  removeSeriesColor(opt_index) {
+    let panel = this.panel;
+    let seriesColors = panel[panel.chartType].seriesColors;
+    let count = seriesColors.length;
+    if (count) {
+      seriesColors.splice(opt_index == null ? count - 1 : opt_index, 1);
+      this.renderNow();
+    }
+  }
+
   addDrilldownLink() {
-    this.panel.drilldownLinks.push({
-      category: '/[^]*/',
-      series: '/[^]*/',
+    let drilldownLink = {
       url: '',
       openInBlank: true
-    });
+    };
+
+    if (this.isActiveOption('categoryColumnName')) {
+      drilldownLink.category = '/[^]*/';
+    }
+    if (this.isActiveOption('seriesColumnName')) {
+      drilldownLink.series = '/[^]*/';
+    }
+
+    this.getChartPanel().drilldownLinks.push(drilldownLink);
   }
 
   removeDrilldownLink(drilldownLink) {
-    let links = this.panel.drilldownLinks;
+    let links = this.getChartPanel().drilldownLinks;
     links.splice(links.indexOf(drilldownLink), 1);
   }
 
@@ -359,12 +462,14 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   onDataReceived(dataList) {
     if (dataList && dataList.length) {
       let data = dataList[0];
-      this.data = {
-        type: data.type,
-        columns: data.columns,
-        rows: data.rows,
-        columnTexts: data.columns.map(col => 'string' === typeof col ? col : col.text)
-      };
+      let { type, columns, rows } = data;
+      let columnTexts = columns.map(col => 'string' === typeof col ? col : col.text);
+      let colIndexesByText = columnTexts.reduceRight(
+        (indexes, colText, index) =>
+          Object.assign(indexes, { [colText]: index }),
+        {}
+      );
+      this.data = { type, columns, rows, columnTexts, colIndexesByText };
     }
     else {
       this.data = {};
@@ -382,6 +487,190 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
 
   renderNow() {
     this.events.emit('renderNow');
+  }
+
+  isActiveOption(...keys) {
+    return keys.every(key => (OPTIONS_BY_TYPE[this.panel.chartType] || []).includes(key));
+  }
+
+  getChartPanel() {
+    return this.panel[this.panel.chartType];
+  }
+
+  drawBarChart(canvas) {
+    renderChart({
+      canvas,
+      data: this.data,
+      panel: this.panel,
+      variables: this.templateSrv.variables
+    });
+  }
+
+  drawFunnelChart(canvas) {
+    let ctrl = this;
+    let data = ctrl.data;
+    let { rows, colIndexesByText } = data;
+    let fullPanel = ctrl.panel;
+    let panel = fullPanel.funnel;
+
+    if (!_.has(colIndexesByText, panel.categoryColumnName)) {
+      throw new Error('Invalid category column.');
+    }
+    let categoryColIndex = colIndexesByText[panel.categoryColumnName];
+
+    if (!_.has(colIndexesByText, panel.measureColumnName)) {
+      throw new Error('Invalid measure column.');
+    }
+    let measureColIndex = colIndexesByText[panel.measureColumnName];
+
+    let categories = _.uniq(rows.map(row => row[categoryColIndex]));
+    let measures = rows.reduce((measures, row, rowIndex) => {
+      let measureIndex = categories.indexOf(row[categoryColIndex]);
+      measures[measureIndex] = (measures[measureIndex] || 0) + row[measureColIndex];
+      return measures;
+    }, []);
+
+    let baseColors;
+    let { colorSource, seriesColors, colorColumnName, sortOrder } = panel;
+    console.log({ colorSource, seriesColors, colorColumnName, sortOrder });
+    if (colorSource === 'column') {
+      if (!_.has(colIndexesByText, colorColumnName)) {
+        throw new Error('Invalid color column.');
+      }
+      let colorColIndex = colIndexesByText[colorColumnName];
+      baseColors = categories.map(category => Color(rows.find(row => row[categoryColIndex] === category)[colorColIndex]));
+    }
+    else if (colorSource === 'custom') {
+      baseColors = categories.map((category, index, categories) => {
+        return Color(seriesColors[index % seriesColors.length]);
+      });
+    }
+    else {
+      baseColors = categories.map((category, index, categories) => {
+        return Color.hsl(~~(360 * index / categories.length), 1, 0.5);
+      });
+    }
+
+    let isLightTheme = config.theme.type === 'light';
+
+    // Sort the measures and then the categories accordingly.
+    let altBaseColors;
+    measures = measures.map((value, index) => ({ index, value }));
+    measures.sort(sortOrder === 'desc' ? (a, b) => b.value - a.value : (a, b) => a.value - b.value);
+    [altBaseColors, categories, measures] = measures.reduce((carry, measure, index) => {
+      let [altBaseColors, newCategories, newMeasures] = carry;
+      altBaseColors.push(baseColors[measure.index]);
+      newCategories.push(categories[measure.index]);
+      newMeasures.push(measure.value);
+      return carry;
+    }, [[], [], []]);
+
+    // If using a column as the source of the colors make sure to order them according to the categories.
+    if (colorSource === 'column') {
+      baseColors = altBaseColors;
+    }
+
+    // Derive the background and border colors from the base colors.
+    let bgColors = baseColors.map(color => color.a(panel.dataBgColorAlpha).rgba());
+    let borderColors = baseColors.map(color => color.a(panel.dataBorderColorAlpha).rgba());
+
+    let dataset = {
+      label: categories,
+      data: measures,
+      borderWidth: 1,
+      borderColor: borderColors,
+      backgroundColor: bgColors
+    };
+
+    let chartConfig = {
+      type: 'funnel',
+      // plugins: [ChartDataLabels],
+      responsive: true,
+      data: {
+        datasets: [ dataset ],
+        labels: 'string' === typeof dataset.label
+          ? dataset.data.map((x, i) => `${dataset.label} #${i + 1}`)
+          : dataset.label
+      },
+      options: {
+        sort: panel.sortOrder,
+        elements: { borderWidth: 1 },
+        gap: panel.gap,
+        keep: /^(left|right)$/.test(panel.hAlign || '') ? panel.hAlign : 'auto',
+        legend: {
+          display: panel.legend.isShowing,
+          position: panel.legend.position,
+          fullWidth: panel.legend.isFullWidth,
+          reverse: panel.legend.isReverse,
+          labels: {
+            fontColor: isLightTheme ? '#333' : '#CCC'
+          }
+        },
+        animation: {
+          animateScale: true,
+          animateRotate: true
+        },
+        onClick (e) {
+          let elem = this.getElementAtEvent(e)[0];
+          if (elem) {
+            let category = categories[elem._index];
+            let isOpen = panel.drilldownLinks.some(drilldownLink => {
+              // Check this link to see if it matches...
+              let { url, category: rgxCategory } = drilldownLink;
+              if (url) {
+                rgxCategory = parseRegExp(rgxCategory);
+                if (rgxCategory.test(category)) {
+                  let matchingRows = rows.filter(row => row[categoryColIndex] === category);
+                  ctrl.openDrilldownLink(drilldownLink, matchingRows);
+                  return true;
+                }
+              }
+            });
+
+            if (!isOpen) {
+              console.log('No matching drilldown link was found for category:', category, rows);
+            }
+          }
+        }
+      }
+    };
+
+    let myChart = new Chart(canvas.getContext('2d'), chartConfig);
+  }
+
+  openDrilldownLink(drilldownLink, matchingRows) {
+    let { data: { colIndexesByText }, templateSrv: { variables } } = this;
+    let { url, openInBlank } = drilldownLink;
+    url = url.replace(
+      /\${(col|var):((?:[^\}:\\]*|\\.)+)(?::(?:(raw)|(param)(?::((?:[^\}:\\]*|\\.)+))?))?}/g,
+      function (match, type, name, isRaw, isParam, paramName) {
+        name = name && name.replace(/\\(.)/g, '$1');
+        paramName = paramName && paramName.replace(/\\(.)/g, '$1');
+        let result = _.uniq(
+          type == 'col'
+            ? matchingRows.map(row => row[colIndexesByText[name]])
+            : variables.reduce(
+              (values, variable) => {
+                // At times current.value is a string and at times it is an array.
+                let varValues = JS.toArray(variable.current.value);
+                let isAll = variable.includeAll && varValues.length === 1 && varValues[0] === '$__all';
+                return variable.name === name
+                  ? values.concat(isAll ? [variable.current.text] : varValues)
+                  : values;
+              },
+              []
+            )
+        );
+        return result.length < 1
+          ? match
+          : isRaw
+            ? result.join(',')
+            : isParam
+              ? result.map(v => encodeURIComponent(paramName == undefined ? name : paramName) + '=' + encodeURIComponent(v)).join('&')
+              : encodeURIComponent(result.join(','));
+      }
+    );
+    window.open(url, drilldownLink.openInBlank ? '_blank' : '_self');    
   }
 
   link(scope, elem, attrs, ctrl) {

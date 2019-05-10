@@ -1,26 +1,54 @@
-<div class="edit-tab-content" ng-repeat="color in ctrl.panel.seriesColors">
-  <h5>{{ color.text }}</h5>
+<div ng-if="ctrl.isActiveOption('colorSource')" class="edit-tab-content">
   <div class="gf-form">
-    <label class="gf-form-label width-12">Base Color</label>
-    <span class="gf-form-label">
-      <color-picker color="color.color" onChange="ctrl.onChangeCallback(color, 'color')"></color-picker>
+    <span class="gf-form-label width-auto">Color Source</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input" ng-model="ctrl.getChartPanel().colorSource" ng-options="ca.value as ca.text for ca in ctrl.CHART_COLOR_SOURCES"
+        ng-change="ctrl.renderNow()"></select>
+    </div>
+  </div>
+  <div class="gf-form" ng-if="ctrl.isActiveOption('colorColumnName') &amp;&amp; ctrl.getChartPanel().colorSource === 'column'">
+    <span class="gf-form-label width-auto">Color Column</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input" ng-model="ctrl.getChartPanel().colorColumnName" ng-options="ct as (ct === null ? '--- NONE ---' : ct) for ct in [null].concat(ctrl.data.columnTexts)" ng-change="ctrl.renderNow()"></select>
+    </div>
+  </div>
+</div>
+
+<div ng-if="ctrl.isActiveOption('seriesColors') &amp;&amp; ctrl.getChartPanel().colorSource === 'custom'" class="edit-tab-content">
+  <h5 style="margin-top: 1em;">Base Colors</h5>
+  <div class="gf-form">
+    <span class="gf-form-label" ng-repeat="(index, color) in ctrl.getChartPanel().seriesColors">
+      <color-picker
+        color="color"
+        onChange="ctrl.onChangeCallback(ctrl.getChartPanel().seriesColors, index)">
+      </color-picker>
     </span>
+  </div>
+  <div>
+    <button class="btn btn-success" ng-click="ctrl.addSeriesColor()">
+      <i class="fa fa-plus-circle"></i>
+      Add A Color
+    </button>
+    <button class="btn btn-danger" ng-click="ctrl.removeSeriesColor()">
+      <i class="fa fa-minus-circle"></i>
+      Remove Last Color
+    </button>
   </div>
 </div>
 
 <div class="edit-tab-content">
-  <h5>Visibility of Dataset Colors</h5>
-  <div class="gf-form">
+  <h5 style="margin-top: 1em;">Visibility of Dataset Colors</h5>
+  <div ng-if="ctrl.isActiveOption('dataBgColorAlpha')" class="gf-form">
     <span class="gf-form-label width-auto">Data Background Alpha</span>
     <div class="gf-form-select-wrapper width-auto">
-      <select class="gf-form-input" ng-model="ctrl.panel.dataBgColorAlpha" ng-options="ca.value as ca.text for ca in ctrl.COLOR_ALPHAS"
+      <select class="gf-form-input" ng-model="ctrl.getChartPanel().dataBgColorAlpha" ng-options="ca.value as ca.text for ca in ctrl.COLOR_ALPHAS"
         ng-change="ctrl.renderNow()"></select>
     </div>
   </div>
-  <div class="gf-form">
+  <div ng-if="ctrl.isActiveOption('dataBorderColorAlpha')" class="gf-form">
     <span class="gf-form-label width-auto">Data Border Alpha</span>
     <div class="gf-form-select-wrapper width-auto">
-      <select class="gf-form-input" ng-model="ctrl.panel.dataBorderColorAlpha" ng-options="ca.value as ca.text for ca in ctrl.COLOR_ALPHAS"
+      <select class="gf-form-input" ng-model="ctrl.getChartPanel().dataBorderColorAlpha" ng-options="ca.value as ca.text for ca in ctrl.COLOR_ALPHAS"
         ng-change="ctrl.renderNow()"></select>
     </div>
   </div>

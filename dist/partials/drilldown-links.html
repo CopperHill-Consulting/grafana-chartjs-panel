@@ -1,10 +1,10 @@
-<div class="edit-tab-content" ng-repeat="dl in ctrl.panel.drilldownLinks">
+<div ng-if="ctrl.isActiveOption('drilldownLinks')" class="edit-tab-content" ng-repeat="dl in ctrl.getChartPanel().drilldownLinks">
   <h5>Link</h5>
-  <div class="gf-form">
+  <div ng-if="dl.category !== undefined" class="gf-form">
     <label class="gf-form-label width-12">Category Pattern</label>
     <input type="text" class="gf-form-input width-max" ng-model="dl.category" ng-change="ctrl.renderNow()" placeholder="Name or RegExp">
   </div>
-  <div class="gf-form">
+  <div ng-if="dl.series !== undefined" class="gf-form">
     <label class="gf-form-label width-12">Series Pattern</label>
     <input type="text" class="gf-form-input width-max" ng-model="dl.series" ng-change="ctrl.renderNow()" placeholder="Name or RegExp">
   </div>
