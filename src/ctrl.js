@@ -6,6 +6,7 @@ import * as ChartDataLabels from './external/Chart.datalabels.plugin';
 import './external/Chart.funnel';
 import config from 'app/core/config';
 import {Color} from './external/CWest-Color.min';
+import { parseRegExp } from './helper-functions';
 
 const PANEL_DEFAULTS = {
   chartType: null
@@ -18,6 +19,7 @@ const BAR_DEFAULTS = {
   stackColumnName: null,
   measureColumnName: null,
   drilldownLinks: [],
+  colorBy: 'series',
   colorSource: 'auto',
   colorColumnName: null,
   seriesColors: [],
@@ -77,261 +79,6 @@ const OPTIONS_BY_TYPE = {
   funnel: FUNNEL_OPTIONS
 };
 
-function renderChart({canvas, data: { type: dataType, columns, rows, columnTexts, colIndexesByText }, panel: fullPanel, variables}) {
-  if (!columnTexts) {
-    throw new Error('No source data has been specified.');
-  }
-
-  if (dataType !== 'table') {
-    throw new Error('Data type must be "table".');
-  }
-
-  let panel = fullPanel.bar;
-
-  if (!_.has(colIndexesByText, panel.categoryColumnName)) {
-    throw new Error('Invalid category column.');
-  }
-  let categoryIndex = colIndexesByText[panel.categoryColumnName];
-
-  if (panel.seriesColumnName != undefined && !_.has(colIndexesByText, panel.seriesColumnName)) {
-    throw new Error('Invalid series column.');
-  }
-  let seriesIndex = panel.seriesColumnName != undefined
-    ? colIndexesByText[panel.seriesColumnName]
-    : -1;
-
-  if (panel.stackColumnName != undefined && !_.has(colIndexesByText, panel.stackColumnName)) {
-    throw new Error('Invalid stack column.');
-  }
-  let stackIndex = panel.stackColumnName != undefined
-    ? colIndexesByText[panel.stackColumnName]
-    : -1;
-
-  if (!_.has(colIndexesByText, panel.measureColumnName)) {
-    throw new Error('Invalid measure column.');
-  }
-  let measureIndex = colIndexesByText[panel.measureColumnName];
-
-  let colRows = rows.map(
-    row =>
-      row.reduceRight(
-        (colRow, value, index) =>
-          Object.assign(colRow, { [columnTexts[index]]: value }),
-        {}
-      )
-  );
-
-  let categories = [...new Set(rows.map(row => row[categoryIndex]))];
-  let { series, seriesStacks } = rows.reduce(
-    (carry, row) => {
-      let seriesName = row[seriesIndex];
-      if (!carry.series.includes(seriesName)) {
-        carry.series.push(seriesName);
-        carry.seriesStacks.push(row[stackIndex]);
-      }
-      return carry;
-    },
-    { series: [], seriesStacks: [] }
-  );
-
-  let oldColors = panel.seriesColors.slice();
-  let newColors = series.map((seriesName, index, series) => {
-    let oldIndex = oldColors.findIndex(c => c.text === seriesName);
-    return {
-      text: seriesName,
-      color: oldIndex < 0
-        ? Color.hsl(~~(360 * index / series.length), 1, 0.5) + ''
-        : oldColors[oldIndex].color
-    };
-  });
-  panel.seriesColors = newColors;
-
-  // Defined with barChartData.data is defined...
-  let measures = {};
-
-  let barChartData = {
-    labels: categories,
-    datasets: series.map((seriesName, seriesNameIndex) => ({
-      label: seriesName == undefined ? 'Series ' + (seriesNameIndex + 1) : seriesName,
-      backgroundColor: Color(newColors[seriesNameIndex].color).a(panel.dataBgColorAlpha).rgba(),
-      borderColor: Color(newColors[seriesNameIndex].color).a(panel.dataBorderColorAlpha).rgba(),
-      borderWidth: 1,
-      stack: panel.isStacked ? seriesStacks[seriesNameIndex] : seriesNameIndex,
-      data: categories.map(category => {
-        let sum = rows.reduce((sum, row) => {
-          let isMatch = row[categoryIndex] === category
-            && (seriesIndex < 0 || row[seriesIndex] === seriesName);
-          return sum + (isMatch ? +row[measureIndex] || 0 : 0);
-        }, 0);
-        return (measures[category] = measures[category] || {})[seriesName] = sum;
-      })
-    }))
-  };
-
-  let isLightTheme = config.theme.type === 'light';
-
-  let myChart = new Chart(canvas, {
-    type: panel.orientation === 'horizontal' ? 'horizontalBar': 'bar',
-    data: barChartData,
-    //plugins: [ChartDataLabels],
-    options: {
-      responsive: true,
-      legend: {
-        display: panel.legend.isShowing,
-        position: panel.legend.position,
-        fullWidth: panel.legend.isFullWidth,
-        reverse: panel.legend.isReverse,
-        labels: {
-          fontColor: isLightTheme ? '#333' : '#CCC'
-        }
-      },
-      scales: {
-        xAxes: [
-          {
-            ticks: {
-              autoSkip: panel.scales.xAxes.ticks.autoSkip,
-              minRotation: panel.scales.xAxes.ticks.minRotation,
-              maxRotation: panel.scales.xAxes.ticks.maxRotation,
-              fontColor: isLightTheme ? '#333' : '#CCC'
-            },
-            stacked: true,
-            gridLines: {
-              display: !!panel.scales.xAxes.gridLineOpacity,
-              color: isLightTheme ? `rgba(0,0,0,${+panel.scales.xAxes.gridLineOpacity})` : `rgba(255,255,255,${+panel.scales.xAxes.gridLineOpacity})`
-            }
-          }
-        ],
-        yAxes: [
-          {
-            ticks: {
-              autoSkip: panel.scales.yAxes.ticks.autoSkip,
-              minRotation: panel.scales.yAxes.ticks.minRotation,
-              maxRotation: panel.scales.yAxes.ticks.maxRotation,
-              fontColor: isLightTheme ? '#333' : '#CCC'
-            },
-            stacked: true,
-            gridLines: {
-              display: !!panel.scales.yAxes.gridLineOpacity,
-              color: isLightTheme ? `rgba(0,0,0,${+panel.scales.yAxes.gridLineOpacity})` : `rgba(255,255,255,${+panel.scales.yAxes.gridLineOpacity})`
-            }
-          }
-        ]
-      },
-      onClick: function(e) {
-        let target = myChart.getElementAtEvent(e)[0],
-            model = target && target._model;
-        if (model) {
-          let category = model.label;
-          let series = model.datasetLabel;
-
-          panel.drilldownLinks.reduce(function (isDone, drilldownLink) {
-            // If a link has already been opened dont check the other links.
-            if (isDone) {
-              return isDone;
-            }
-
-            // Check this link to see if it matches...
-            let url = drilldownLink.url;
-            if (url) {
-              let rgxCategory = parseRegExp(drilldownLink.category);
-              let rgxSeries = parseRegExp(drilldownLink.series);
-              if (rgxCategory.test(category) && (series == undefined || rgxSeries.test(series))) {
-                url = url.replace(
-                  /\${(col|var):((?:[^\}:\\]*|\\.)+)(?::(?:(raw)|(param)(?::((?:[^\}:\\]*|\\.)+))?))?}/g,
-                  function(match, type, name, isRaw, isParam, paramName) {
-                    let result = [...new Set(
-                      type == 'col'
-                        ? getColValuesFor(colIndexesByText[name], category, series, categoryIndex, seriesIndex, rows)
-                        : getVarValuesFor(name, variables)
-                    )];
-                    return result.length < 1
-                      ? match
-                      : isRaw
-                        ? result.join(',')
-                        : isParam
-                          ? result.map(v => encodeURIComponent(paramName == undefined ? name : paramName) + '=' + encodeURIComponent(v)).join('&')
-                          : encodeURIComponent(result.join(','));
-                  }
-                );
-                window.open(url, drilldownLink.openInBlank ? '_blank' : '_self');
-                return true;
-              }
-            }
-          }, false);
-        }
-      }
-    }
-  });
-}
-
-function getColValuesFor(colIndex, category, series, catColIndex, seriesColIndex, rows) {
-  if (colIndex >= 0) {
-    return rows.reduce((values, row) => {
-      if (category === row[catColIndex] && (seriesColIndex < 0 || row[seriesColIndex] === series)) {
-        values.push(row[colIndex]);
-      }
-      return values;
-    }, []);
-  }
-  return [];
-}
-
-function getVarValuesFor(varName, variables) {
-  return variables.reduce(
-    (values, variable) => {
-      // At times current.value is a string and at times it is an array.
-      let varValues = JS.toArray(variable.current.value);
-      let isAll = variable.includeAll && varValues.length === 1 && varValues[0] === '$__all';
-      return variable.name === varName
-        ? values.concat(isAll ? [variable.current.text] : varValues)
-        : values;
-    },
-    []
-  );
-}
-
-function parseRegExp(strPattern) {
-  var parts = /^\/(.+)\/(\w*)$/.exec(strPattern);
-  return parts ? new RegExp(parts[1], parts[2]) : new RegExp('^' + _.escapeRegExp(strPattern) + '$', 'i');
-}
-
-function renderNow(e, jElem) {
-  let error,
-      isValid = false,
-      ctrl = this,
-      chartType = ctrl.panel.chartType,
-      data = ctrl.data,
-      jContent = jElem.find('.panel-content').css('position', 'relative').html(''),
-      elemContent = jContent[0],
-      jCanvas = jQuery('<canvas>').appendTo(jContent),
-      canvas = jCanvas[0];
-  
-  if (data && data.rows && data.rows.length) {
-    if (data.type === 'table') {
-      jCanvas.prop({ width: jContent.width(), height: jContent.height() });
-      try {
-        if ('bar' === chartType) {
-          ctrl.drawBarChart(canvas);
-        }
-        else if ('funnel' === chartType) {
-          ctrl.drawFunnelChart(canvas);
-        }
-        isValid = true;
-      }
-      catch(e) {
-        console.error('renderChart:', error = e);
-      }
-    }
-  }
-  if (!isValid) {
-    let msg = 'No data' + (error ? ':  \r\n' + error.message : '.');
-    let elemMsg = JS.dom({ _: 'div', style: { display: 'flex', alignItems: 'center', textAlign: 'center', height: '100%' }, $: [
-      { _: 'div', cls: 'alert alert-error', style: { margin: '0px auto' }, text: msg }
-    ]});
-    jContent.html('').append(elemMsg);
-  }
-}
-
 export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   constructor($scope, $injector, $rootScope) {
     super($scope, $injector);
@@ -340,6 +87,11 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       { value: false, text: 'None' },
       { value: 0.15, text: 'Light' },
       { value: 0.65, text: 'Dark' }
+    ];
+    this.CHART_COLOR_BY = [
+      { value: 'series', text: 'Series' },
+      { value: 'category', text: 'Category' },
+      { value: 'both', text: 'Series & Category' }
     ];
     this.CHART_COLOR_SOURCES = [
       { value: 'column', text: 'Column' },
@@ -417,12 +169,18 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     this.renderNow();
   }
 
+  moveSeriesColor(fromIndex, toIndex) {
+    let colors = this.getChartPanel().seriesColors;
+    colors.splice(toIndex, 0, colors.splice(fromIndex, 1)[0]);
+    this.renderNow();
+  }
+
   removeSeriesColor(opt_index) {
     let panel = this.panel;
-    let seriesColors = panel[panel.chartType].seriesColors;
-    let count = seriesColors.length;
+    let colors = panel[panel.chartType].seriesColors;
+    let count = colors.length;
     if (count) {
-      seriesColors.splice(opt_index == null ? count - 1 : opt_index, 1);
+      colors.splice(opt_index == null ? count - 1 : opt_index, 1);
       this.renderNow();
     }
   }
@@ -497,13 +255,235 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     return this.panel[this.panel.chartType];
   }
 
+  getColIndex(name, panel, opt_isOptional) {
+    let { colIndexesByText } = this.data;
+    let key = name + 'ColumnName';
+    let isRequired = !opt_isOptional || panel[key] != undefined;
+    if (isRequired && !_.has(colIndexesByText, panel[key])) {
+      throw new Error(`Invalid ${name} column.`);
+    }
+    return isRequired ? colIndexesByText[panel[key]] : -1;
+  }
+
+  drawChart(e, jElem) {
+    let error,
+      isValid = false,
+      ctrl = this,
+      chartType = ctrl.panel.chartType,
+      data = ctrl.data,
+      jContent = jElem.find('.panel-content').css('position', 'relative').html(''),
+      elemContent = jContent[0],
+      jCanvas = jQuery('<canvas>').appendTo(jContent),
+      canvas = jCanvas[0];
+
+    if (data && data.rows && data.rows.length) {
+      jCanvas.prop({ width: jContent.width(), height: jContent.height() });
+      try {
+        if (!data.columnTexts) {
+          throw new Error('No source data has been specified.');
+        }
+
+        if (data.type !== 'table') {
+          throw new Error('Data type must be "table".');
+        }
+
+        if ('bar' === chartType) {
+          ctrl.drawBarChart(canvas);
+        }
+        else if ('funnel' === chartType) {
+          ctrl.drawFunnelChart(canvas);
+        }
+        isValid = true;
+      }
+      catch (e) {
+        console.error('drawChart:', error = e);
+      }
+    }
+    if (!isValid) {
+      let msg = 'No data' + (error ? ':  \r\n' + error.message : '.');
+      let elemMsg = JS.dom({
+        _: 'div', style: { display: 'flex', alignItems: 'center', textAlign: 'center', height: '100%' }, $: [
+          { _: 'div', cls: 'alert alert-error', style: { margin: '0px auto' }, text: msg }
+        ]
+      });
+      jContent.html('').append(elemMsg);
+    }
+  }
+
   drawBarChart(canvas) {
-    renderChart({
-      canvas,
-      data: this.data,
-      panel: this.panel,
-      variables: this.templateSrv.variables
-    });
+    let ctrl = this;
+    let data = ctrl.data;
+    let { rows, colIndexesByText } = data;
+    let fullPanel = ctrl.panel;
+    let panel = fullPanel.bar;
+
+    let categoryColIndex = ctrl.getColIndex('category', panel);
+    let seriesColIndex = ctrl.getColIndex('series', panel, true);
+    let stackColIndex = ctrl.getColIndex('stack', panel, true);
+    let measureColIndex = ctrl.getColIndex('measure', panel);
+    let ignoreSeries = seriesColIndex < 0;
+
+    let categories = _.uniq(rows.map(row => row[categoryColIndex]));
+    let { series, seriesStacks } = rows.reduce(
+      (carry, row) => {
+        let seriesName = row[seriesColIndex];
+        if (!carry.series.includes(seriesName)) {
+          carry.series.push(seriesName);
+          carry.seriesStacks.push(row[stackColIndex]);
+        }
+        return carry;
+      },
+      { series: [], seriesStacks: [] }
+    );
+
+    series = series.map(name => name === undefined ? 'Series' : name);
+    seriesStacks = series.map(name => name === undefined ? 'Stack' : name);
+
+    // If legacy bar chart colors exist convert them to new color setup
+    if (_.has(panel, ['seriesColors', 0, 'text'])) {
+      panel.seriesColors = panel.seriesColors.map(color => color.color);
+      panel.colorSource = 'custom';
+    }
+
+    let { colorSource, seriesColors, colorColumnName, colorBy } = panel;
+
+    let colorColIndex;
+    if (colorSource === 'column') {
+       colorColIndex = ctrl.getColIndex('color', panel);
+    }
+
+    let baseColors = rows.reduce((colors, row) => {
+      let color = colors.find(c => seriesColIndex >= 0 ? c.series === row[seriesColIndex] : true && c.category === row[categoryColIndex]);
+      let rowSeries = ignoreSeries ? series[0] : row[seriesColIndex];
+      let rowCategory = row[categoryColIndex];
+      if (!colors.find(c => (ignoreSeries || c.series === rowSeries) && c.category === rowCategory)) {
+        let color = { series: rowSeries, category: rowCategory };
+        if (colorColIndex >= 0) {
+          color.value = Color(row[colorColIndex]);
+        }
+        else {
+          color.index = colorBy === 'both'
+            ? colors.length
+            : colorBy === 'category'
+              ? categories.indexOf(rowCategory)
+              : series.indexOf(rowSeries);
+        }
+        colors.push(color);
+      }
+      return colors;
+    }, []);
+    if (colorSource === 'custom') { // user-defined
+      baseColors.forEach((c, i) => {
+        c.value = Color(seriesColors[c.index % seriesColors.length]);
+      });
+    }
+    else if (colorSource !== 'column') { // rainbow
+      let colorIndexLimit = colorBy === 'both'
+        ? baseColors.length
+        : colorBy === 'category'
+          ? categories.length
+          : series.length;
+      baseColors.forEach((c, i, a) => {
+        c.value = Color.hsl(~~(360 * c.index / colorIndexLimit), 1, 0.5);
+      });
+    }
+    
+    let isLightTheme = config.theme.type === 'light';
+    
+    let measures = {};
+    let chartConfig = {
+      type: panel.orientation === 'horizontal' ? 'horizontalBar' : 'bar',
+      data: {
+        labels: categories,
+        datasets: series.map((seriesName, seriesNameIndex) => ({
+          label: seriesName,
+          backgroundColor: categories.map(cat => Color((baseColors.find(color => color.category === cat && color.series === seriesName) || {}).value).a(panel.dataBgColorAlpha).rgba()),
+          borderColor: categories.map(cat => Color((baseColors.find(color => color.category === cat && color.series === seriesName) || {}).value).a(panel.dataBorderColorAlpha).rgba()),
+          borderWidth: 1,
+          stack: panel.isStacked ? seriesStacks[seriesNameIndex] : seriesNameIndex,
+          data: categories.map(category => {
+            let sum = rows.reduce((sum, row) => {
+              let isMatch = row[categoryColIndex] === category
+                && (seriesColIndex < 0 || row[seriesColIndex] === seriesName);
+              return sum + (isMatch ? +row[measureColIndex] || 0 : 0);
+            }, 0);
+            return (measures[category] = measures[category] || {})[seriesName] = sum;
+          })
+        }))
+      },
+      //plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        legend: {
+          display: panel.legend.isShowing,
+          position: panel.legend.position,
+          fullWidth: panel.legend.isFullWidth,
+          reverse: panel.legend.isReverse,
+          labels: {
+            fontColor: isLightTheme ? '#333' : '#CCC'
+          }
+        },
+        scales: {
+          xAxes: [
+            {
+              ticks: {
+                autoSkip: panel.scales.xAxes.ticks.autoSkip,
+                minRotation: panel.scales.xAxes.ticks.minRotation,
+                maxRotation: panel.scales.xAxes.ticks.maxRotation,
+                fontColor: isLightTheme ? '#333' : '#CCC'
+              },
+              stacked: true,
+              gridLines: {
+                display: !!panel.scales.xAxes.gridLineOpacity,
+                color: isLightTheme ? `rgba(0,0,0,${+panel.scales.xAxes.gridLineOpacity})` : `rgba(255,255,255,${+panel.scales.xAxes.gridLineOpacity})`
+              }
+            }
+          ],
+          yAxes: [
+            {
+              ticks: {
+                autoSkip: panel.scales.yAxes.ticks.autoSkip,
+                minRotation: panel.scales.yAxes.ticks.minRotation,
+                maxRotation: panel.scales.yAxes.ticks.maxRotation,
+                fontColor: isLightTheme ? '#333' : '#CCC'
+              },
+              stacked: true,
+              gridLines: {
+                display: !!panel.scales.yAxes.gridLineOpacity,
+                color: isLightTheme ? `rgba(0,0,0,${+panel.scales.yAxes.gridLineOpacity})` : `rgba(255,255,255,${+panel.scales.yAxes.gridLineOpacity})`
+              }
+            }
+          ]
+        },
+        onClick: function (e) {
+          let target = myChart.getElementAtEvent(e)[0];
+          let model = target && target._model;
+          if (model) {
+            let category = model.label;
+            let seriesName = model.datasetLabel;
+            let isOpen = panel.drilldownLinks.some(drilldownLink => {
+              // Check this link to see if it matches...
+              let { url, category: rgxCategory, series: rgxSeries } = drilldownLink;
+              if (url) {
+                rgxCategory = parseRegExp(rgxCategory);
+                rgxSeries = !ignoreSeries && parseRegExp(rgxSeries);
+                if (rgxCategory.test(category) && (ignoreSeries || rgxSeries.test(seriesName))) {
+                  let matchingRows = rows.filter(row => row[categoryColIndex] === category && (ignoreSeries || row[seriesColIndex] === seriesName));
+                  ctrl.openDrilldownLink(drilldownLink, matchingRows);
+                  return true;
+                }
+              }
+            });
+
+            if (!isOpen) {
+              console.log('No matching drilldown link was found:', { series: seriesName, category, rows });
+            }
+          }
+        }
+      }
+    };
+
+    let myChart = new Chart(canvas.getContext('2d'), chartConfig);
   }
 
   drawFunnelChart(canvas) {
@@ -513,15 +493,8 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     let fullPanel = ctrl.panel;
     let panel = fullPanel.funnel;
 
-    if (!_.has(colIndexesByText, panel.categoryColumnName)) {
-      throw new Error('Invalid category column.');
-    }
-    let categoryColIndex = colIndexesByText[panel.categoryColumnName];
-
-    if (!_.has(colIndexesByText, panel.measureColumnName)) {
-      throw new Error('Invalid measure column.');
-    }
-    let measureColIndex = colIndexesByText[panel.measureColumnName];
+    let categoryColIndex = ctrl.getColIndex('category', panel);
+    let measureColIndex = ctrl.getColIndex('measure', panel);
 
     let categories = _.uniq(rows.map(row => row[categoryColIndex]));
     let measures = rows.reduce((measures, row, rowIndex) => {
@@ -532,7 +505,6 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
 
     let baseColors;
     let { colorSource, seriesColors, colorColumnName, sortOrder } = panel;
-    console.log({ colorSource, seriesColors, colorColumnName, sortOrder });
     if (colorSource === 'column') {
       if (!_.has(colIndexesByText, colorColumnName)) {
         throw new Error('Invalid color column.');
@@ -673,9 +645,13 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     window.open(url, drilldownLink.openInBlank ? '_blank' : '_self');    
   }
 
+  getRange() {
+    return _.range.apply(this, arguments);
+  }
+
   link(scope, elem, attrs, ctrl) {
-    this.events.on('renderNow', e => renderNow.call(this, e, elem));
-    this.events.on('render', _.debounce(e => renderNow.call(this, e, elem), 250));
+    this.events.on('renderNow', e => this.drawChart.call(this, e, elem));
+    this.events.on('render', _.debounce(e => this.drawChart.call(this, e, elem), 250));
   }
 }
 
