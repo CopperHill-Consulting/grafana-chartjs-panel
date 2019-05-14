@@ -252,6 +252,7 @@
               chartArea = chart.chartArea,
               opts = chart.options,
               sort = opts.sort,
+              startWidthPercent = opts.startWidthPercent,
               dwRatio = me.dwRatio,
               elHeight = me.elHeight,
               gap = opts.gap || 0,
@@ -272,8 +273,12 @@
                 },
                 index
               );
-              upperWidth = previousElement ? previousElement.val * dwRatio : me.topWidth;
               bottomWidth = elementData.val * dwRatio;
+              upperWidth = previousElement
+                ? previousElement.val * dwRatio
+                : startWidthPercent === 'half'
+                  ? bottomWidth * startWidthPercent
+                  : me.topWidth;
             } else {
               var nextElement = helpers.findNextWhere(me.sortedDataAndLabels,
                 function (el) {
@@ -282,7 +287,11 @@
                 index
               );
               upperWidth = elementData.val * dwRatio;
-              bottomWidth = nextElement ? nextElement.val * dwRatio : me.topWidth;
+              bottomWidth = nextElement
+                ? nextElement.val * dwRatio
+                : startWidthPercent != undefined
+                  ? upperWidth * startWidthPercent
+                  : me.topWidth;
             }
 
             y = chartArea.top + viewIndex * (elHeight + gap);

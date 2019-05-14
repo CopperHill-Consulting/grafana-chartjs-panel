@@ -65,6 +65,7 @@ const FUNNEL_DEFAULTS = {
   dataBgColorAlpha: 0.75,
   dataBorderColorAlpha: 1,
   gap: 1,
+  startWidthPct: 0,
   legend: {
     isShowing: true,
     position: 'top',
@@ -87,6 +88,13 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       { value: false, text: 'None' },
       { value: 0.15, text: 'Light' },
       { value: 0.65, text: 'Dark' }
+    ];
+    this.CHART_START_WIDTH_PERCENTAGES = [
+      { value: 0, text: '0% (Point)' },
+      { value: 0.25, text: '25%' },
+      { value: 0.5, text: '50% (Half)' },
+      { value: 0.75, text: '75%' },
+      { value: 1, text: '100% (Full)' }
     ];
     this.CHART_COLOR_BY = [
       { value: 'series', text: 'Series' },
@@ -565,6 +573,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
           : dataset.label
       },
       options: {
+        startWidthPercent: panel.startWidthPct,
         sort: panel.sortOrder,
         elements: { borderWidth: 1 },
         gap: panel.gap,

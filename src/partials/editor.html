@@ -40,6 +40,16 @@
       </select>
     </div>
   </div>
+  <div ng-if="ctrl.isActiveOption('startWidthPct')" class="gf-form">
+    <span class="gf-form-label width-auto">Starting Width</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().startWidthPct"
+        ng-options="ct.value as ct.text for ct in ctrl.CHART_START_WIDTH_PERCENTAGES"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
   <div ng-if="ctrl.isActiveOption('isStacked')" class="gf-form">
     <gf-form-switch class="gf-form" label="Is Stacked" label-class="width-auto" checked="ctrl.getChartPanel().isStacked" on-change="ctrl.renderNow()"></gf-form-switch>
   </div>
