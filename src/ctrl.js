@@ -473,7 +473,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
                 fontColor: isLightTheme ? '#333' : '#CCC',
                 userCallback: function (value, index, values) {
                   let { ticks } = panel.scales.xAxes;
-                  return (ticks.numberFormat !== 'none' && 'number' === typeof value)
+                  return (!['none', null, void 0].includes(ticks.numberFormat) && 'number' === typeof value)
                     ? getValueFormat(ticks.numberFormat)(value, ticks.numberFormatDecimals, null)
                     : value;
                 }
@@ -494,7 +494,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
                 fontColor: isLightTheme ? '#333' : '#CCC',
                 userCallback: function (value, index, values) {
                   let { ticks } = panel.scales.yAxes;
-                  return (ticks.numberFormat !== 'none' && 'number' === typeof value)
+                  return (!['none', null, void 0].includes(ticks.numberFormat) && 'number' === typeof value)
                     ? getValueFormat(ticks.numberFormat)(value, ticks.numberFormatDecimals, null)
                     : value;
                 }

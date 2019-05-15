@@ -683,7 +683,7 @@ function (_MetricsPanelCtrl) {
                 fontColor: isLightTheme ? '#333' : '#CCC',
                 userCallback: function userCallback(value, index, values) {
                   var ticks = panel.scales.xAxes.ticks;
-                  return ticks.numberFormat !== 'none' && 'number' === typeof value ? (0, _ui.getValueFormat)(ticks.numberFormat)(value, ticks.numberFormatDecimals, null) : value;
+                  return !['none', null, void 0].includes(ticks.numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(ticks.numberFormat)(value, ticks.numberFormatDecimals, null) : value;
                 }
               },
               stacked: true,
@@ -700,7 +700,7 @@ function (_MetricsPanelCtrl) {
                 fontColor: isLightTheme ? '#333' : '#CCC',
                 userCallback: function userCallback(value, index, values) {
                   var ticks = panel.scales.yAxes.ticks;
-                  return ticks.numberFormat !== 'none' && 'number' === typeof value ? (0, _ui.getValueFormat)(ticks.numberFormat)(value, ticks.numberFormatDecimals, null) : value;
+                  return !['none', null, void 0].includes(ticks.numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(ticks.numberFormat)(value, ticks.numberFormatDecimals, null) : value;
                 }
               },
               stacked: true,
