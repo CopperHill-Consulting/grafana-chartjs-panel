@@ -7,6 +7,10 @@ exports.ChartJsPanelCtrl = void 0;
 
 var _sdk = require("app/plugins/sdk");
 
+var _ui = require("@grafana/ui");
+
+var _config = _interopRequireDefault(require("app/core/config"));
+
 var _lodash = _interopRequireDefault(require("lodash"));
 
 var _YourJS = _interopRequireDefault(require("./external/YourJS.min"));
@@ -16,8 +20,6 @@ var Chart = _interopRequireWildcard(require("./external/Chart.bundle.min"));
 var ChartDataLabels = _interopRequireWildcard(require("./external/Chart.datalabels.plugin"));
 
 require("./external/Chart.funnel");
-
-var _config = _interopRequireDefault(require("app/core/config"));
 
 var _CWestColor = require("./external/CWest-Color.min");
 
@@ -84,7 +86,9 @@ var BAR_DEFAULTS = {
       ticks: {
         autoSkip: true,
         minRotation: 0,
-        maxRotation: 90
+        maxRotation: 90,
+        numberFormat: 'none',
+        numberFormatDecimals: 0
       },
       gridLineOpacity: 0.15
     },
@@ -92,7 +96,9 @@ var BAR_DEFAULTS = {
       ticks: {
         autoSkip: true,
         minRotation: 0,
-        maxRotation: 90
+        maxRotation: 90,
+        numberFormat: 'none',
+        numberFormatDecimals: 0
       },
       gridLineOpacity: 0.15
     }
@@ -137,6 +143,7 @@ function (_MetricsPanelCtrl) {
     _classCallCheck(this, ChartJsPanelCtrl);
 
     _this = _possibleConstructorReturn(this, _getPrototypeOf(ChartJsPanelCtrl).call(this, $scope, $injector));
+    _this.UNIT_FORMATS = (0, _ui.getValueFormats)();
     _this.GRID_LINE_OPACITIES = [{
       value: false,
       text: 'None'
@@ -424,13 +431,24 @@ function (_MetricsPanelCtrl) {
     value: function isActiveOption() {
       var _this3 = this;
 
-      for (var _len = arguments.length, keys = new Array(_len), _key = 0; _key < _len; _key++) {
-        keys[_key] = arguments[_key];
+      for (var _len = arguments.length, paths = new Array(_len), _key = 0; _key < _len; _key++) {
+        paths[_key] = arguments[_key];
       }
 
-      return keys.every(function (key) {
-        return (OPTIONS_BY_TYPE[_this3.panel.chartType] || []).includes(key);
+      return paths.every(function (path) {
+        return (OPTIONS_BY_TYPE[_this3.panel.chartType] || []).includes(path);
       });
+    }
+  }, {
+    key: "setActiveOption",
+    value: function setActiveOption(path, value) {
+      var panel = this.getChartPanel();
+
+      if (_lodash.default.has(panel, path)) {
+        _lodash.default.set(panel, path, value);
+
+        this.renderNow();
+      }
     }
   }, {
     key: "getChartPanel",
@@ -662,7 +680,11 @@ function (_MetricsPanelCtrl) {
                 autoSkip: panel.scales.xAxes.ticks.autoSkip,
                 minRotation: panel.scales.xAxes.ticks.minRotation,
                 maxRotation: panel.scales.xAxes.ticks.maxRotation,
-                fontColor: isLightTheme ? '#333' : '#CCC'
+                fontColor: isLightTheme ? '#333' : '#CCC',
+                userCallback: function userCallback(value, index, values) {
+                  var ticks = panel.scales.xAxes.ticks;
+                  return ticks.numberFormat !== 'none' && 'number' === typeof value ? (0, _ui.getValueFormat)(ticks.numberFormat)(value, ticks.numberFormatDecimals, null) : value;
+                }
               },
               stacked: true,
               gridLines: {
@@ -675,7 +697,11 @@ function (_MetricsPanelCtrl) {
                 autoSkip: panel.scales.yAxes.ticks.autoSkip,
                 minRotation: panel.scales.yAxes.ticks.minRotation,
                 maxRotation: panel.scales.yAxes.ticks.maxRotation,
-                fontColor: isLightTheme ? '#333' : '#CCC'
+                fontColor: isLightTheme ? '#333' : '#CCC',
+                userCallback: function userCallback(value, index, values) {
+                  var ticks = panel.scales.yAxes.ticks;
+                  return ticks.numberFormat !== 'none' && 'number' === typeof value ? (0, _ui.getValueFormat)(ticks.numberFormat)(value, ticks.numberFormatDecimals, null) : value;
+                }
               },
               stacked: true,
               gridLines: {

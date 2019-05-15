@@ -1,8 +1,14 @@
 "use strict";
 
+var _moment = _interopRequireDefault(require("moment"));
+
 var _lodash = _interopRequireDefault(require("lodash"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function dateTime(input, formatInput) {
+  return (0, _moment.default)(input, formatInput);
+}
 
 function parseRegExp(strPattern) {
   var parts = /^\/(.+)\/(\w*)$/.exec(strPattern);
@@ -10,6 +16,7 @@ function parseRegExp(strPattern) {
 }
 
 module.exports = {
+  dateTime: dateTime,
   parseRegExp: parseRegExp
 };
 //# sourceMappingURL=helper-functions.js.map

@@ -176,6 +176,25 @@
       </select>
     </div>
   </div>
+  <div ng-if="ctrl.isActiveOption('scales.xAxes.ticks.numberFormat')">
+    <div class="gf-form">
+      <label class="gf-form-label width-auto">Unit</label>
+      <div class="gf-form-dropdown-typeahead width-auto"
+        ng-model="ctrl.getChartPanel().scales.xAxes.ticks.numberFormat"
+        dropdown-typeahead2="ctrl.UNIT_FORMATS"
+        dropdown-typeahead-on-select="ctrl.setActiveOption('scales.xAxes.ticks.numberFormat', $subItem.value)">
+      </div>
+    </div>
+    <div ng-if="ctrl.getChartPanel().scales.xAxes.ticks.numberFormat != 'none' &amp;&amp; ctrl.isActiveOption('scales.xAxes.ticks.numberFormatDecimals')" class="gf-form">
+      <label class="gf-form-label width-auto">Decimals</label>
+      <input type="number"
+        class="gf-form-input width-4"
+        data-placement="right"
+        ng-model="ctrl.getChartPanel().scales.xAxes.ticks.numberFormatDecimals"
+        ng-change="ctrl.renderNow()"
+      />
+    </div>
+  </div>
 </div>
 <div ng-if="ctrl.isActiveOption('scales.yAxes')" class="section gf-form-group">
   <h5>Y-Axis</h5>
@@ -210,6 +229,25 @@
         ng-options="r.value as r.text for r in ctrl.GRID_LINE_OPACITIES"
         ng-change="ctrl.renderNow()">
       </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.isActiveOption('scales.yAxes.ticks.numberFormat')">
+    <div class="gf-form">
+      <label class="gf-form-label width-auto">Unit</label>
+      <div class="gf-form-dropdown-typeahead width-auto"
+        ng-model="ctrl.getChartPanel().scales.yAxes.ticks.numberFormat"
+        dropdown-typeahead2="ctrl.UNIT_FORMATS"
+        dropdown-typeahead-on-select="ctrl.setActiveOption('scales.yAxes.ticks.numberFormat', $subItem.value)">
+      </div>
+    </div>
+    <div ng-if="ctrl.getChartPanel().scales.yAxes.ticks.numberFormat != 'none' &amp;&amp; ctrl.isActiveOption('scales.yAxes.ticks.numberFormatDecimals')" class="gf-form">
+      <label class="gf-form-label width-auto">Decimals</label>
+      <input type="number"
+        class="gf-form-input width-4"
+        data-placement="right"
+        ng-model="ctrl.getChartPanel().scales.yAxes.ticks.numberFormatDecimals"
+        ng-change="ctrl.renderNow()"
+      />
     </div>
   </div>
 </div>

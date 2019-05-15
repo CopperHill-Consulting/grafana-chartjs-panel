@@ -1,11 +1,14 @@
-import {MetricsPanelCtrl} from 'app/plugins/sdk';
+import { MetricsPanelCtrl } from 'app/plugins/sdk';
+import { getValueFormat, getValueFormats } from '@grafana/ui';
+import config from 'app/core/config';
 import _ from 'lodash';
+
 import JS from './external/YourJS.min';
 import * as Chart from './external/Chart.bundle.min';
 import * as ChartDataLabels from './external/Chart.datalabels.plugin';
 import './external/Chart.funnel';
-import config from 'app/core/config';
-import {Color} from './external/CWest-Color.min';
+import { Color } from './external/CWest-Color.min';
+
 import { parseRegExp } from './helper-functions';
 
 const PANEL_DEFAULTS = {
@@ -38,7 +41,9 @@ const BAR_DEFAULTS = {
       ticks: {
         autoSkip: true,
         minRotation: 0,
-        maxRotation: 90
+        maxRotation: 90,
+        numberFormat: 'none',
+        numberFormatDecimals: 0
       },
       gridLineOpacity: 0.15
     },
@@ -46,7 +51,9 @@ const BAR_DEFAULTS = {
       ticks: {
         autoSkip: true,
         minRotation: 0,
-        maxRotation: 90
+        maxRotation: 90,
+        numberFormat: 'none',
+        numberFormatDecimals: 0
       },
       gridLineOpacity: 0.15
     }
@@ -85,7 +92,8 @@ const OPTIONS_BY_TYPE = {
 export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   constructor($scope, $injector, $rootScope) {
     super($scope, $injector);
-
+    
+    this.UNIT_FORMATS = getValueFormats();
     this.GRID_LINE_OPACITIES = [
       { value: false, text: 'None' },
       { value: 0.15, text: 'Light' },
@@ -271,8 +279,16 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     this.events.emit('renderNow');
   }
 
-  isActiveOption(...keys) {
-    return keys.every(key => (OPTIONS_BY_TYPE[this.panel.chartType] || []).includes(key));
+  isActiveOption(...paths) {
+    return paths.every(path => (OPTIONS_BY_TYPE[this.panel.chartType] || []).includes(path));
+  }
+
+  setActiveOption(path, value) {
+    let panel = this.getChartPanel();
+    if (_.has(panel, path)) {
+      _.set(panel, path, value);
+      this.renderNow();
+    }
   }
 
   getChartPanel() {
@@ -454,7 +470,13 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
                 autoSkip: panel.scales.xAxes.ticks.autoSkip,
                 minRotation: panel.scales.xAxes.ticks.minRotation,
                 maxRotation: panel.scales.xAxes.ticks.maxRotation,
-                fontColor: isLightTheme ? '#333' : '#CCC'
+                fontColor: isLightTheme ? '#333' : '#CCC',
+                userCallback: function (value, index, values) {
+                  let { ticks } = panel.scales.xAxes;
+                  return (ticks.numberFormat !== 'none' && 'number' === typeof value)
+                    ? getValueFormat(ticks.numberFormat)(value, ticks.numberFormatDecimals, null)
+                    : value;
+                }
               },
               stacked: true,
               gridLines: {
@@ -469,7 +491,13 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
                 autoSkip: panel.scales.yAxes.ticks.autoSkip,
                 minRotation: panel.scales.yAxes.ticks.minRotation,
                 maxRotation: panel.scales.yAxes.ticks.maxRotation,
-                fontColor: isLightTheme ? '#333' : '#CCC'
+                fontColor: isLightTheme ? '#333' : '#CCC',
+                userCallback: function (value, index, values) {
+                  let { ticks } = panel.scales.yAxes;
+                  return (ticks.numberFormat !== 'none' && 'number' === typeof value)
+                    ? getValueFormat(ticks.numberFormat)(value, ticks.numberFormatDecimals, null)
+                    : value;
+                }
               },
               stacked: true,
               gridLines: {
