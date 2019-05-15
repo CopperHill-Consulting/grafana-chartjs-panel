@@ -70,7 +70,7 @@
       </select>
     </div>
   </div>
-  <div ng-if="ctrl.isActiveOption('dataBorderColorAlpha')" class="gf-form">
+  <div ng-if="ctrl.getChartPanel().borderWidth &gt; 0 &amp;&amp; ctrl.isActiveOption('dataBorderColorAlpha')" class="gf-form">
     <span class="gf-form-label width-auto">Data Border Alpha</span>
     <div class="gf-form-select-wrapper width-auto">
       <select class="gf-form-input"

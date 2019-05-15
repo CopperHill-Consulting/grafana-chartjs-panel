@@ -19,6 +19,7 @@ const BAR_DEFAULTS = {
   stackColumnName: null,
   measureColumnName: null,
   drilldownLinks: [],
+  borderWidth: 1,
   colorBy: 'series',
   colorSource: 'auto',
   colorColumnName: null,
@@ -59,6 +60,7 @@ const FUNNEL_DEFAULTS = {
   categoryColumnName: null,
   measureColumnName: null,
   drilldownLinks: [],
+  borderWidth: 1,
   colorSource: 'auto',
   colorColumnName: null,
   seriesColors: [],
@@ -95,6 +97,20 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       { value: 0.5, text: '50% (Half)' },
       { value: 0.75, text: '75%' },
       { value: 1, text: '100% (Full)' }
+    ];
+    this.CHART_BORDER_WIDTHS = [
+      { value: 0, text: '0px (NO BORDER)' },
+      { value: 1, text: '1px' },
+      { value: 2, text: '2px' },
+      { value: 3, text: '3px' }
+    ];
+    this.CHART_GAP_SIZES = [
+      { value: 0, text: '0px (NO GAP)' },
+      { value: 1, text: '1px' },
+      { value: 2, text: '2px' },
+      { value: 3, text: '3px' },
+      { value: 4, text: '4px' },
+      { value: 5, text: '5px' }
     ];
     this.CHART_COLOR_BY = [
       { value: 'series', text: 'Series' },
@@ -345,7 +361,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     );
 
     series = series.map(name => name === undefined ? 'Series' : name);
-    seriesStacks = series.map(name => name === undefined ? 'Stack' : name);
+    seriesStacks = seriesStacks.map(name => name === undefined ? 'Stack' : name);
 
     // If legacy bar chart colors exist convert them to new color setup
     if (_.has(panel, ['seriesColors', 0, 'text'])) {
@@ -407,7 +423,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
           label: seriesName,
           backgroundColor: categories.map(cat => Color((baseColors.find(color => color.category === cat && color.series === seriesName) || {}).value).a(panel.dataBgColorAlpha).rgba()),
           borderColor: categories.map(cat => Color((baseColors.find(color => color.category === cat && color.series === seriesName) || {}).value).a(panel.dataBorderColorAlpha).rgba()),
-          borderWidth: 1,
+          borderWidth: panel.borderWidth,
           stack: panel.isStacked ? seriesStacks[seriesNameIndex] : seriesNameIndex,
           data: categories.map(category => {
             let sum = rows.reduce((sum, row) => {
@@ -575,7 +591,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       options: {
         startWidthPercent: panel.startWidthPct,
         sort: panel.sortOrder,
-        elements: { borderWidth: 1 },
+        elements: { borderWidth: panel.borderWidth },
         gap: panel.gap,
         keep: /^(left|right)$/.test(panel.hAlign || '') ? panel.hAlign : 'auto',
         legend: {

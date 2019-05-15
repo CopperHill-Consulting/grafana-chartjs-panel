@@ -50,6 +50,29 @@
       </select>
     </div>
   </div>
+  <div ng-if="ctrl.isActiveOption('gap')" class="gf-form">
+    <span class="gf-form-label width-auto">Gap Size</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().gap"
+        ng-options="ct.value as ct.text for ct in ctrl.CHART_GAP_SIZES"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.isActiveOption('borderWidth')" class="gf-form">
+    <span class="gf-form-label width-auto">Border Width</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().borderWidth"
+        ng-options="ct.value as ct.text for ct in ctrl.CHART_BORDER_WIDTHS"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+</div>
+<div class="section gf-form-group">
+  <h5>Column Definitions</h5>
   <div ng-if="ctrl.isActiveOption('isStacked')" class="gf-form">
     <gf-form-switch class="gf-form" label="Is Stacked" label-class="width-auto" checked="ctrl.getChartPanel().isStacked" on-change="ctrl.renderNow()"></gf-form-switch>
   </div>

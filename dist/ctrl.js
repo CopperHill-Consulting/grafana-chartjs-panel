@@ -65,6 +65,7 @@ var BAR_DEFAULTS = {
   stackColumnName: null,
   measureColumnName: null,
   drilldownLinks: [],
+  borderWidth: 1,
   colorBy: 'series',
   colorSource: 'auto',
   colorColumnName: null,
@@ -104,6 +105,7 @@ var FUNNEL_DEFAULTS = {
   categoryColumnName: null,
   measureColumnName: null,
   drilldownLinks: [],
+  borderWidth: 1,
   colorSource: 'auto',
   colorColumnName: null,
   seriesColors: [],
@@ -160,6 +162,38 @@ function (_MetricsPanelCtrl) {
     }, {
       value: 1,
       text: '100% (Full)'
+    }];
+    _this.CHART_BORDER_WIDTHS = [{
+      value: 0,
+      text: '0px (NO BORDER)'
+    }, {
+      value: 1,
+      text: '1px'
+    }, {
+      value: 2,
+      text: '2px'
+    }, {
+      value: 3,
+      text: '3px'
+    }];
+    _this.CHART_GAP_SIZES = [{
+      value: 0,
+      text: '0px (NO GAP)'
+    }, {
+      value: 1,
+      text: '1px'
+    }, {
+      value: 2,
+      text: '2px'
+    }, {
+      value: 3,
+      text: '3px'
+    }, {
+      value: 4,
+      text: '4px'
+    }, {
+      value: 5,
+      text: '5px'
     }];
     _this.CHART_COLOR_BY = [{
       value: 'series',
@@ -518,7 +552,7 @@ function (_MetricsPanelCtrl) {
       series = series.map(function (name) {
         return name === undefined ? 'Series' : name;
       });
-      seriesStacks = series.map(function (name) {
+      seriesStacks = seriesStacks.map(function (name) {
         return name === undefined ? 'Stack' : name;
       }); // If legacy bar chart colors exist convert them to new color setup
 
@@ -598,7 +632,7 @@ function (_MetricsPanelCtrl) {
                   return color.category === cat && color.series === seriesName;
                 }) || {}).value).a(panel.dataBorderColorAlpha).rgba();
               }),
-              borderWidth: 1,
+              borderWidth: panel.borderWidth,
               stack: panel.isStacked ? seriesStacks[seriesNameIndex] : seriesNameIndex,
               data: categories.map(function (category) {
                 var sum = rows.reduce(function (sum, row) {
@@ -804,7 +838,7 @@ function (_MetricsPanelCtrl) {
           startWidthPercent: panel.startWidthPct,
           sort: panel.sortOrder,
           elements: {
-            borderWidth: 1
+            borderWidth: panel.borderWidth
           },
           gap: panel.gap,
           keep: /^(left|right)$/.test(panel.hAlign || '') ? panel.hAlign : 'auto',
