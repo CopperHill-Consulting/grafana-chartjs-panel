@@ -591,46 +591,32 @@ function (_MetricsPanelCtrl) {
         colorColIndex = ctrl.getColIndex('color', panel);
       }
 
-      var baseColors = rows.reduce(function (colors, row) {
-        var color = colors.find(function (c) {
-          return seriesColIndex >= 0 ? c.series === row[seriesColIndex] : true && c.category === row[categoryColIndex];
-        });
-        var rowSeries = ignoreSeries ? series[0] : row[seriesColIndex];
-        var rowCategory = row[categoryColIndex];
+      var rowCount = rows.length;
+      var colorCount = colorBy === 'category' ? categories.length : colorBy === 'both' ? categories.length * series.length : series.length;
+      var baseColors = series.map(function (seriesName, seriesIndex) {
+        return categories.map(function (catName, catIndex) {
+          if (colorSource === 'column' && colorColIndex >= 0) {
+            // column
+            for (var row, rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+              row = rows[rowIndex];
 
-        if (!colors.find(function (c) {
-          return (ignoreSeries || c.series === rowSeries) && c.category === rowCategory;
-        })) {
-          var _color = {
-            series: rowSeries,
-            category: rowCategory
-          };
-
-          if (colorColIndex >= 0) {
-            _color.value = (0, _CWestColor.Color)(row[colorColIndex]);
+              if ((seriesColIndex < 0 || row[seriesColIndex] === seriesName) && row[categoryColIndex] === catName) {
+                return (0, _CWestColor.Color)(row[colorColIndex]);
+              }
+            }
           } else {
-            _color.index = colorBy === 'both' ? colors.length : colorBy === 'category' ? categories.indexOf(rowCategory) : series.indexOf(rowSeries);
+            var index = colorBy === 'category' ? catIndex : colorBy === 'both' ? catIndex + categories.length * seriesIndex : seriesIndex;
+
+            if (colorSource === 'custom') {
+              // user-defined
+              return (0, _CWestColor.Color)(seriesColors[index % seriesColors.length]);
+            } else {
+              // rainbow (default)
+              return _CWestColor.Color.hsl(~~(360 * index / colorCount), 1, 0.5);
+            }
           }
-
-          colors.push(_color);
-        }
-
-        return colors;
-      }, []);
-
-      if (colorSource === 'custom') {
-        // user-defined
-        baseColors.forEach(function (c, i) {
-          c.value = (0, _CWestColor.Color)(seriesColors[c.index % seriesColors.length]);
         });
-      } else if (colorSource !== 'column') {
-        // rainbow
-        var colorIndexLimit = colorBy === 'both' ? baseColors.length : colorBy === 'category' ? categories.length : series.length;
-        baseColors.forEach(function (c, i, a) {
-          c.value = _CWestColor.Color.hsl(~~(360 * c.index / colorIndexLimit), 1, 0.5);
-        });
-      }
-
+      });
       var isLightTheme = _config.default.theme.type === 'light';
       var measures = {};
       var chartConfig = {
@@ -640,15 +626,11 @@ function (_MetricsPanelCtrl) {
           datasets: series.map(function (seriesName, seriesNameIndex) {
             return {
               label: seriesName,
-              backgroundColor: categories.map(function (cat) {
-                return (0, _CWestColor.Color)((baseColors.find(function (color) {
-                  return color.category === cat && color.series === seriesName;
-                }) || {}).value).a(panel.dataBgColorAlpha).rgba();
+              backgroundColor: baseColors[seriesNameIndex].map(function (color) {
+                return color.a(panel.dataBgColorAlpha).rgba();
               }),
-              borderColor: categories.map(function (cat) {
-                return (0, _CWestColor.Color)((baseColors.find(function (color) {
-                  return color.category === cat && color.series === seriesName;
-                }) || {}).value).a(panel.dataBorderColorAlpha).rgba();
+              borderColor: baseColors[seriesNameIndex].map(function (color) {
+                return color.a(panel.dataBorderColorAlpha).rgba();
               }),
               borderWidth: panel.borderWidth,
               stack: panel.isStacked ? seriesStacks[seriesNameIndex] : seriesNameIndex,
