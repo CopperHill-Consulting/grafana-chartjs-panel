@@ -75,6 +75,8 @@ var BAR_DEFAULTS = {
   isStacked: false,
   dataBgColorAlpha: 0.75,
   dataBorderColorAlpha: 1,
+  numberFormat: 'none',
+  numberFormatDecimals: 0,
   legend: {
     isShowing: true,
     position: 'top',
@@ -86,9 +88,7 @@ var BAR_DEFAULTS = {
       ticks: {
         autoSkip: true,
         minRotation: 0,
-        maxRotation: 90,
-        numberFormat: 'none',
-        numberFormatDecimals: 0
+        maxRotation: 90
       },
       gridLineOpacity: 0.15
     },
@@ -96,9 +96,7 @@ var BAR_DEFAULTS = {
       ticks: {
         autoSkip: true,
         minRotation: 0,
-        maxRotation: 90,
-        numberFormat: 'none',
-        numberFormatDecimals: 0
+        maxRotation: 90
       },
       gridLineOpacity: 0.15
     }
@@ -117,6 +115,8 @@ var FUNNEL_DEFAULTS = {
   seriesColors: [],
   dataBgColorAlpha: 0.75,
   dataBorderColorAlpha: 1,
+  numberFormat: 'none',
+  numberFormatDecimals: 0,
   gap: 1,
   startWidthPct: 0,
   legend: {
@@ -681,6 +681,27 @@ function (_MetricsPanelCtrl) {
         //plugins: [ChartDataLabels],
         options: {
           responsive: true,
+          tooltips: {
+            mode: 'point',
+            callbacks: {
+              title: function title(_ref) {
+                var _ref2 = _slicedToArray(_ref, 1),
+                    tooltipItem = _ref2[0];
+
+                if (!ignoreSeries) {
+                  return tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel'];
+                }
+              },
+              label: function label(tooltipItem, data) {
+                var numberFormat = panel.numberFormat,
+                    numberFormatDecimals = panel.numberFormatDecimals;
+                var label = ignoreSeries ? tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel'] : data.datasets[tooltipItem.datasetIndex].label;
+                var value = tooltipItem[panel.orientation === 'horizontal' ? 'xLabel' : 'yLabel'];
+                value = !['none', null, void 0].includes(numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(numberFormat)(value, numberFormatDecimals, null) : value;
+                return label + ': ' + value;
+              }
+            }
+          },
           legend: {
             display: panel.legend.isShowing,
             position: panel.legend.position,
@@ -698,8 +719,9 @@ function (_MetricsPanelCtrl) {
                 maxRotation: panel.scales.xAxes.ticks.maxRotation,
                 fontColor: isLightTheme ? '#333' : '#CCC',
                 userCallback: function userCallback(value, index, values) {
-                  var ticks = panel.scales.xAxes.ticks;
-                  return !['none', null, void 0].includes(ticks.numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(ticks.numberFormat)(value, ticks.numberFormatDecimals, null) : value;
+                  var numberFormat = panel.numberFormat,
+                      numberFormatDecimals = panel.numberFormatDecimals;
+                  return !['none', null, void 0].includes(numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(numberFormat)(value, numberFormatDecimals, null) : value;
                 }
               },
               stacked: true,
@@ -715,8 +737,9 @@ function (_MetricsPanelCtrl) {
                 maxRotation: panel.scales.yAxes.ticks.maxRotation,
                 fontColor: isLightTheme ? '#333' : '#CCC',
                 userCallback: function userCallback(value, index, values) {
-                  var ticks = panel.scales.yAxes.ticks;
-                  return !['none', null, void 0].includes(ticks.numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(ticks.numberFormat)(value, ticks.numberFormatDecimals, null) : value;
+                  var numberFormat = panel.numberFormat,
+                      numberFormatDecimals = panel.numberFormatDecimals;
+                  return !['none', null, void 0].includes(numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(numberFormat)(value, numberFormatDecimals, null) : value;
                 }
               },
               stacked: true,
@@ -891,6 +914,18 @@ function (_MetricsPanelCtrl) {
           },
           gap: panel.gap,
           keep: /^(left|right)$/.test(panel.hAlign || '') ? panel.hAlign : 'auto',
+          tooltips: {
+            callbacks: {
+              label: function label(tooltipItem, data) {
+                var numberFormat = panel.numberFormat,
+                    numberFormatDecimals = panel.numberFormatDecimals;
+                var label = data.datasets[tooltipItem.datasetIndex].label[tooltipItem.index];
+                var value = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
+                value = !['none', null, void 0].includes(numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(numberFormat)(value, numberFormatDecimals, null) : value;
+                return label + ': ' + value;
+              }
+            }
+          },
           legend: {
             display: panel.legend.isShowing,
             position: panel.legend.position,

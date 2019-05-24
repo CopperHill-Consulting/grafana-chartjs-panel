@@ -30,6 +30,8 @@ const BAR_DEFAULTS = {
   isStacked: false,
   dataBgColorAlpha: 0.75,
   dataBorderColorAlpha: 1,
+  numberFormat: 'none',
+  numberFormatDecimals: 0,
   legend: {
     isShowing: true,
     position: 'top',
@@ -41,9 +43,7 @@ const BAR_DEFAULTS = {
       ticks: {
         autoSkip: true,
         minRotation: 0,
-        maxRotation: 90,
-        numberFormat: 'none',
-        numberFormatDecimals: 0
+        maxRotation: 90
       },
       gridLineOpacity: 0.15
     },
@@ -51,9 +51,7 @@ const BAR_DEFAULTS = {
       ticks: {
         autoSkip: true,
         minRotation: 0,
-        maxRotation: 90,
-        numberFormat: 'none',
-        numberFormatDecimals: 0
+        maxRotation: 90
       },
       gridLineOpacity: 0.15
     }
@@ -73,6 +71,8 @@ const FUNNEL_DEFAULTS = {
   seriesColors: [],
   dataBgColorAlpha: 0.75,
   dataBorderColorAlpha: 1,
+  numberFormat: 'none',
+  numberFormatDecimals: 0,
   gap: 1,
   startWidthPct: 0,
   legend: {
@@ -480,6 +480,27 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       //plugins: [ChartDataLabels],
       options: {
         responsive: true,
+        tooltips: {
+          mode: 'point',
+          callbacks: {
+            title: function ([tooltipItem]) {
+              if (!ignoreSeries) {
+                return tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel'];
+              }
+            },
+            label: function (tooltipItem, data) {
+              let { numberFormat, numberFormatDecimals } = panel;
+              let label = ignoreSeries
+                ? tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel']
+                : data.datasets[tooltipItem.datasetIndex].label;
+              let value = tooltipItem[panel.orientation === 'horizontal' ? 'xLabel' : 'yLabel'];
+              value = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
+                  ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
+                  : value;
+              return label + ': ' + value;
+            }
+          }
+        },
         legend: {
           display: panel.legend.isShowing,
           position: panel.legend.position,
@@ -498,9 +519,9 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
                 maxRotation: panel.scales.xAxes.ticks.maxRotation,
                 fontColor: isLightTheme ? '#333' : '#CCC',
                 userCallback: function (value, index, values) {
-                  let { ticks } = panel.scales.xAxes;
-                  return (!['none', null, void 0].includes(ticks.numberFormat) && 'number' === typeof value)
-                    ? getValueFormat(ticks.numberFormat)(value, ticks.numberFormatDecimals, null)
+                  let { numberFormat, numberFormatDecimals } = panel;
+                  return (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
+                    ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
                     : value;
                 }
               },
@@ -519,9 +540,9 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
                 maxRotation: panel.scales.yAxes.ticks.maxRotation,
                 fontColor: isLightTheme ? '#333' : '#CCC',
                 userCallback: function (value, index, values) {
-                  let { ticks } = panel.scales.yAxes;
-                  return (!['none', null, void 0].includes(ticks.numberFormat) && 'number' === typeof value)
-                    ? getValueFormat(ticks.numberFormat)(value, ticks.numberFormatDecimals, null)
+                  let { numberFormat, numberFormatDecimals } = panel;
+                  return (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
+                    ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
                     : value;
                 }
               },
@@ -663,6 +684,19 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         elements: { borderWidth: panel.borderWidth },
         gap: panel.gap,
         keep: /^(left|right)$/.test(panel.hAlign || '') ? panel.hAlign : 'auto',
+        tooltips: {
+          callbacks: {
+            label: function (tooltipItem, data) {
+              let { numberFormat, numberFormatDecimals } = panel;
+              let label = data.datasets[tooltipItem.datasetIndex].label[tooltipItem.index];
+              let value = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
+              value = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
+                ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
+                : value;
+              return label + ': ' + value;
+            }
+          }
+        },
         legend: {
           display: panel.legend.isShowing,
           position: panel.legend.position,
