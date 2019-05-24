@@ -961,10 +961,15 @@ function (_MetricsPanelCtrl) {
     key: "openDrilldownLink",
     value: function openDrilldownLink(drilldownLink, matchingRows) {
       var colIndexesByText = this.data.colIndexesByText,
-          variables = this.templateSrv.variables;
+          variables = this.templateSrv.variables,
+          timeVars = this.timeSrv.time;
       var url = drilldownLink.url,
           openInBlank = drilldownLink.openInBlank;
-      url = url.replace(/\${(col|var):((?:[^\}:\\]*|\\.)+)(?::(?:(raw)|(param)(?::((?:[^\}:\\]*|\\.)+))?))?}/g, function (match, type, name, isRaw, isParam, paramName) {
+      url = url.replace(/\$\{(time)(?:-(to|from))?\}|\$\{(col|var):((?:[^\}:\\]*|\\.)+)(?::(?:(raw)|(param)(?::((?:[^\}:\\]*|\\.)+))?))?\}/g, function (match, isTime, opt_timePart, type, name, isRaw, isParam, paramName) {
+        if (isTime) {
+          return (opt_timePart != 'to' ? 'from=' + encodeURIComponent(timeVars.from) : '') + (opt_timePart ? '' : '&') + (opt_timePart != 'from' ? 'to=' + encodeURIComponent(timeVars.to) : '');
+        }
+
         name = name && name.replace(/\\(.)/g, '$1');
         paramName = paramName && paramName.replace(/\\(.)/g, '$1');
 
