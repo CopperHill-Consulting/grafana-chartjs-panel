@@ -1,5 +1,12 @@
 # Changelog
 
+- **v2.1.0**
+  - Added `${time}`, `${time-from}` and `${time-to}` as meta groups for adding the time variables into drilldown links.
+  - Added the pointer cursor to linked segments.
+  - Made number formatting global for ticks and for numbers displayed in tooltis.
+  - Fixed issue where series at times would be represented by black in the legend but would have a color in bar charts.
+  - Fixed issue preventing the color source from being changed for funnel charts.
+
 - **v2.0.0**
   - Added funnel chart.
   - Allowing colors to be specified by column, by selecting them or by generating them (rainbow colors).

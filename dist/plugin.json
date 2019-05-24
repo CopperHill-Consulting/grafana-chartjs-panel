@@ -17,8 +17,8 @@
     "links": [
       {"name": "Project site", "url": "https://github.com/westc/grafana-chartjs-panel.git"}
     ],
-    "version": "2.0.0",
-    "updated": "2019-05-15"
+    "version": "2.1.0",
+    "updated": "2019-05-24"
   },
 
   "dependencies": {
