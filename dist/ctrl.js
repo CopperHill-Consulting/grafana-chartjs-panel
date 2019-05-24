@@ -617,6 +617,40 @@ function (_MetricsPanelCtrl) {
           }
         });
       });
+
+      function testChartEvent(e, callback) {
+        var target = this.getElementAtEvent(e)[0];
+        var model = target && target._model;
+        var isOpen;
+
+        if (model) {
+          var category = model.label;
+          var seriesName = model.datasetLabel;
+          isOpen = panel.drilldownLinks.some(function (drilldownLink, drilldownLinkIndex) {
+            // Check this link to see if it matches...
+            var url = drilldownLink.url,
+                rgxCategory = drilldownLink.category,
+                rgxSeries = drilldownLink.series;
+
+            if (url) {
+              rgxCategory = (0, _helperFunctions.parseRegExp)(rgxCategory);
+              rgxSeries = !ignoreSeries && (0, _helperFunctions.parseRegExp)(rgxSeries);
+
+              if (rgxCategory.test(category) && (ignoreSeries || rgxSeries.test(seriesName))) {
+                callback(drilldownLinkIndex, rows.filter(function (row) {
+                  return row[categoryColIndex] === category && (ignoreSeries || row[seriesColIndex] === seriesName);
+                }));
+                return true;
+              }
+            }
+          });
+        }
+
+        if (!isOpen) {
+          callback(-1, []);
+        }
+      }
+
       var isLightTheme = _config.default.theme.type === 'light';
       var measures = {};
       var chartConfig = {
@@ -693,39 +727,17 @@ function (_MetricsPanelCtrl) {
             }]
           },
           onClick: function onClick(e) {
-            var target = myChart.getElementAtEvent(e)[0];
-            var model = target && target._model;
-
-            if (model) {
-              var category = model.label;
-              var seriesName = model.datasetLabel;
-              var isOpen = panel.drilldownLinks.some(function (drilldownLink) {
-                // Check this link to see if it matches...
-                var url = drilldownLink.url,
-                    rgxCategory = drilldownLink.category,
-                    rgxSeries = drilldownLink.series;
-
-                if (url) {
-                  rgxCategory = (0, _helperFunctions.parseRegExp)(rgxCategory);
-                  rgxSeries = !ignoreSeries && (0, _helperFunctions.parseRegExp)(rgxSeries);
-
-                  if (rgxCategory.test(category) && (ignoreSeries || rgxSeries.test(seriesName))) {
-                    var matchingRows = rows.filter(function (row) {
-                      return row[categoryColIndex] === category && (ignoreSeries || row[seriesColIndex] === seriesName);
-                    });
-                    ctrl.openDrilldownLink(drilldownLink, matchingRows);
-                    return true;
-                  }
-                }
-              });
-
-              if (!isOpen) {
-                console.log('No matching drilldown link was found:', {
-                  series: seriesName,
-                  category: category,
-                  rows: rows
-                });
+            testChartEvent.call(this, e, function (drilldownLinkIndex, matchingRows) {
+              if (drilldownLinkIndex >= 0) {
+                ctrl.openDrilldownLink(panel.drilldownLinks[drilldownLinkIndex], matchingRows);
               }
+            });
+          },
+          hover: {
+            onHover: function onHover(e) {
+              testChartEvent.call(this, e, function (drilldownLinkIndex, matchingRows) {
+                e.target.style.cursor = drilldownLinkIndex >= 0 ? 'pointer' : 'default';
+              });
             }
           }
         }
@@ -816,6 +828,35 @@ function (_MetricsPanelCtrl) {
       // If using a column as the source of the colors make sure to order them according to the categories.
       if (colorSource === 'column') {
         baseColors = altBaseColors;
+      }
+
+      function testChartEvent(e, callback) {
+        var elem = this.getElementAtEvent(e)[0];
+        var isOpen;
+
+        if (elem) {
+          var category = categories[elem._index];
+          isOpen = panel.drilldownLinks.some(function (drilldownLink, drilldownLinkIndex) {
+            // Check this link to see if it matches...
+            var url = drilldownLink.url,
+                rgxCategory = drilldownLink.category;
+
+            if (url) {
+              rgxCategory = (0, _helperFunctions.parseRegExp)(rgxCategory);
+
+              if (rgxCategory.test(category)) {
+                callback(drilldownLinkIndex, rows.filter(function (row) {
+                  return row[categoryColIndex] === category;
+                }));
+                return true;
+              }
+            }
+          });
+        }
+
+        if (!isOpen) {
+          callback(-1, []);
+        }
       } // Derive the background and border colors from the base colors.
 
 
@@ -864,31 +905,17 @@ function (_MetricsPanelCtrl) {
             animateRotate: true
           },
           onClick: function onClick(e) {
-            var elem = this.getElementAtEvent(e)[0];
-
-            if (elem) {
-              var category = categories[elem._index];
-              var isOpen = panel.drilldownLinks.some(function (drilldownLink) {
-                // Check this link to see if it matches...
-                var url = drilldownLink.url,
-                    rgxCategory = drilldownLink.category;
-
-                if (url) {
-                  rgxCategory = (0, _helperFunctions.parseRegExp)(rgxCategory);
-
-                  if (rgxCategory.test(category)) {
-                    var matchingRows = rows.filter(function (row) {
-                      return row[categoryColIndex] === category;
-                    });
-                    ctrl.openDrilldownLink(drilldownLink, matchingRows);
-                    return true;
-                  }
-                }
-              });
-
-              if (!isOpen) {
-                console.log('No matching drilldown link was found for category:', category, rows);
+            testChartEvent.call(this, e, function (drilldownLinkIndex, matchingRows) {
+              if (drilldownLinkIndex >= 0) {
+                ctrl.openDrilldownLink(panel.drilldownLinks[drilldownLinkIndex], matchingRows);
               }
+            });
+          },
+          hover: {
+            onHover: function onHover(e) {
+              testChartEvent.call(this, e, function (drilldownLinkIndex, matchingRows) {
+                e.target.style.cursor = drilldownLinkIndex >= 0 ? 'pointer' : 'default';
+              });
             }
           }
         }

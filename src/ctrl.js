@@ -424,6 +424,35 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         }
       });
     });
+
+    function testChartEvent(e, callback) {
+      let target = this.getElementAtEvent(e)[0];
+      let model = target && target._model;
+      let isOpen;
+      if (model) {
+        let category = model.label;
+        let seriesName = model.datasetLabel;
+        isOpen = panel.drilldownLinks.some((drilldownLink, drilldownLinkIndex) => {
+          // Check this link to see if it matches...
+          let { url, category: rgxCategory, series: rgxSeries } = drilldownLink;
+          if (url) {
+            rgxCategory = parseRegExp(rgxCategory);
+            rgxSeries = !ignoreSeries && parseRegExp(rgxSeries);
+            if (rgxCategory.test(category) && (ignoreSeries || rgxSeries.test(seriesName))) {
+              callback(
+                drilldownLinkIndex,
+                rows.filter(row => row[categoryColIndex] === category && (ignoreSeries || row[seriesColIndex] === seriesName))
+              );
+              return true;
+            }
+          }
+        });
+      }
+
+      if (!isOpen) {
+        callback(-1, []);
+      }
+    }
     
     let isLightTheme = config.theme.type === 'light';
     
@@ -505,28 +534,17 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
           ]
         },
         onClick: function (e) {
-          let target = myChart.getElementAtEvent(e)[0];
-          let model = target && target._model;
-          if (model) {
-            let category = model.label;
-            let seriesName = model.datasetLabel;
-            let isOpen = panel.drilldownLinks.some(drilldownLink => {
-              // Check this link to see if it matches...
-              let { url, category: rgxCategory, series: rgxSeries } = drilldownLink;
-              if (url) {
-                rgxCategory = parseRegExp(rgxCategory);
-                rgxSeries = !ignoreSeries && parseRegExp(rgxSeries);
-                if (rgxCategory.test(category) && (ignoreSeries || rgxSeries.test(seriesName))) {
-                  let matchingRows = rows.filter(row => row[categoryColIndex] === category && (ignoreSeries || row[seriesColIndex] === seriesName));
-                  ctrl.openDrilldownLink(drilldownLink, matchingRows);
-                  return true;
-                }
-              }
-            });
-
-            if (!isOpen) {
-              console.log('No matching drilldown link was found:', { series: seriesName, category, rows });
+          testChartEvent.call(this, e, (drilldownLinkIndex, matchingRows) => {
+            if (drilldownLinkIndex >= 0) {
+              ctrl.openDrilldownLink(panel.drilldownLinks[drilldownLinkIndex], matchingRows);
             }
+          });
+        },
+        hover: {
+          onHover: function (e) {
+            testChartEvent.call(this, e, (drilldownLinkIndex, matchingRows) => {
+              e.target.style.cursor = drilldownLinkIndex >= 0 ? 'pointer' : 'default';
+            });
           }
         }
       }
@@ -591,6 +609,32 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       baseColors = altBaseColors;
     }
 
+    function testChartEvent(e, callback) {
+      let elem = this.getElementAtEvent(e)[0];
+      let isOpen;
+      if (elem) {
+        let category = categories[elem._index];
+        isOpen = panel.drilldownLinks.some((drilldownLink, drilldownLinkIndex) => {
+          // Check this link to see if it matches...
+          let { url, category: rgxCategory } = drilldownLink;
+          if (url) {
+            rgxCategory = parseRegExp(rgxCategory);
+            if (rgxCategory.test(category)) {
+              callback(
+                drilldownLinkIndex,
+                rows.filter(row => row[categoryColIndex] === category)
+              );
+              return true;
+            }
+          }
+        });
+      }
+
+      if (!isOpen) {
+        callback(-1, []);
+      }
+    }
+
     // Derive the background and border colors from the base colors.
     let bgColors = baseColors.map(color => color.a(panel.dataBgColorAlpha).rgba());
     let borderColors = baseColors.map(color => color.a(panel.dataBorderColorAlpha).rgba());
@@ -632,26 +676,18 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
           animateScale: true,
           animateRotate: true
         },
-        onClick (e) {
-          let elem = this.getElementAtEvent(e)[0];
-          if (elem) {
-            let category = categories[elem._index];
-            let isOpen = panel.drilldownLinks.some(drilldownLink => {
-              // Check this link to see if it matches...
-              let { url, category: rgxCategory } = drilldownLink;
-              if (url) {
-                rgxCategory = parseRegExp(rgxCategory);
-                if (rgxCategory.test(category)) {
-                  let matchingRows = rows.filter(row => row[categoryColIndex] === category);
-                  ctrl.openDrilldownLink(drilldownLink, matchingRows);
-                  return true;
-                }
-              }
-            });
-
-            if (!isOpen) {
-              console.log('No matching drilldown link was found for category:', category, rows);
+        onClick: function (e) {
+          testChartEvent.call(this, e, (drilldownLinkIndex, matchingRows) => {
+            if (drilldownLinkIndex >= 0) {
+              ctrl.openDrilldownLink(panel.drilldownLinks[drilldownLinkIndex], matchingRows);
             }
+          });
+        },
+        hover: {
+          onHover: function (e) {
+            testChartEvent.call(this, e, (drilldownLinkIndex, matchingRows) => {
+              e.target.style.cursor = drilldownLinkIndex >= 0 ? 'pointer' : 'default';
+            });
           }
         }
       }
