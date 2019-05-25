@@ -276,7 +276,7 @@
               bottomWidth = elementData.val * dwRatio;
               upperWidth = previousElement
                 ? previousElement.val * dwRatio
-                : startWidthPercent === 'half'
+                : startWidthPercent != undefined
                   ? bottomWidth * startWidthPercent
                   : me.topWidth;
             } else {
