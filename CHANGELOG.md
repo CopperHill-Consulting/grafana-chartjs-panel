@@ -1,5 +1,8 @@
 # Changelog
 
+- **v2.1.2**
+  - Fixed descending minimum width for funnel chart.
+
 - **v2.1.1**
   - Changed "Startiing Width" to "Minimum Width".
   - Fixed bug where the minimum with didn't work in ascending order.
