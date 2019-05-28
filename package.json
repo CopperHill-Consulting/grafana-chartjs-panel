@@ -1,13 +1,13 @@
 {
   "name": "westc-chartjs-panel",
   "private": true,
-  "version": "2.1.2",
+  "version": "2.1.3",
   "description": "",
   "repository": {
     "type": "git",
-    "url": "https://github.com/westc/grafana-chartjs-panel.git"
+    "url": "https://github.com/CopperHill-Consulting/grafana-chartjs-panel.git"
   },
-  "author": "westc",
+  "author": "Chris West",
   "license": "MIT",
   "devDependencies": {
     "grunt": "^0.4.5",

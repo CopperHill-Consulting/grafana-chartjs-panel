@@ -1,11 +1,15 @@
 # Changelog
 
+- **v2.1.3**
+  - Added some documentation for drilldown links.
+  - Fixed `${var:nameOfVar:param}` so that it will evaluate to `var-nameOfVar=...`.
+
 - **v2.1.2**
   - Fixed descending minimum width for funnel chart.
 
 - **v2.1.1**
-  - Changed "Startiing Width" to "Minimum Width".
-  - Fixed bug where the minimum with didn't work in ascending order.
+  - Changed "Starting Width" to "Minimum Width".
+  - Fixed bug where the minimum width didn't work in ascending order.
 
 - **v2.1.0**
   - Added `${time}`, `${time-from}` and `${time-to}` as meta groups for adding the time variables into drilldown links.

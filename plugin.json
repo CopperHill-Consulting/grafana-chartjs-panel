@@ -6,8 +6,8 @@
   "info": {
     "description": "Use Chart.js to add bar charts and funnel charts to Grafana.",
     "author": {
-      "name": "westc",
-      "url": "https://github.com/westc/grafana-chartjs-panel.git"
+      "name": "Chris West",
+      "url": "https://github.com/westc/"
     },
     "keywords": ["panel"],
     "logos": {
@@ -15,9 +15,9 @@
       "large": "img/logo.png"
     },
     "links": [
-      {"name": "Project site", "url": "https://github.com/westc/grafana-chartjs-panel.git"}
+      {"name": "Project site", "url": "https://github.com/CopperHill-Consulting/grafana-chartjs-panel.git"}
     ],
-    "version": "2.1.2",
+    "version": "2.1.3",
     "updated": "2019-05-28"
   },
 

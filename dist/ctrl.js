@@ -57,6 +57,8 @@ function _inherits(subClass, superClass) { if (typeof superClass !== "function" 
 
 function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
 
+var RGX_CELL_PLACEHOLDER = /\$\{(time)(?:-(to|from))?\}|\$\{(col|var):((?:[^\}:\\]*|\\.)+)(?::(?:(raw)|(param)(?::((?:[^\}:\\]*|\\.)+))?))?\}/g;
+var RGX_OLD_VAR_WORKAROUND = /([\?&])var-(\$\{var:(?:[^\}:\\]*|\\.)+:param\})/g;
 var PANEL_DEFAULTS = {
   chartType: null
 };
@@ -965,7 +967,7 @@ function (_MetricsPanelCtrl) {
           timeVars = this.timeSrv.time;
       var url = drilldownLink.url,
           openInBlank = drilldownLink.openInBlank;
-      url = url.replace(/\$\{(time)(?:-(to|from))?\}|\$\{(col|var):((?:[^\}:\\]*|\\.)+)(?::(?:(raw)|(param)(?::((?:[^\}:\\]*|\\.)+))?))?\}/g, function (match, isTime, opt_timePart, type, name, isRaw, isParam, paramName) {
+      url = url.replace(RGX_OLD_VAR_WORKAROUND, '$1$2').replace(RGX_CELL_PLACEHOLDER, function (match, isTime, opt_timePart, type, name, isRaw, isParam, paramName) {
         if (isTime) {
           return (opt_timePart != 'to' ? 'from=' + encodeURIComponent(timeVars.from) : '') + (opt_timePart ? '' : '&') + (opt_timePart != 'from' ? 'to=' + encodeURIComponent(timeVars.to) : '');
         }
@@ -984,7 +986,7 @@ function (_MetricsPanelCtrl) {
         }, []));
 
         return result.length < 1 ? match : isRaw ? result.join(',') : isParam ? result.map(function (v) {
-          return encodeURIComponent(paramName == undefined ? name : paramName) + '=' + encodeURIComponent(v);
+          return encodeURIComponent(paramName == undefined ? type === 'var' ? "var-".concat(name) : name : paramName) + '=' + encodeURIComponent(v);
         }).join('&') : encodeURIComponent(result.join(','));
       });
       window.open(url, drilldownLink.openInBlank ? '_blank' : '_self');

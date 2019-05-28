@@ -11,6 +11,9 @@ import { Color } from './external/CWest-Color.min';
 
 import { parseRegExp } from './helper-functions';
 
+const RGX_CELL_PLACEHOLDER = /\$\{(time)(?:-(to|from))?\}|\$\{(col|var):((?:[^\}:\\]*|\\.)+)(?::(?:(raw)|(param)(?::((?:[^\}:\\]*|\\.)+))?))?\}/g;
+const RGX_OLD_VAR_WORKAROUND = /([\?&])var-(\$\{var:(?:[^\}:\\]*|\\.)+:param\})/g;
+
 const PANEL_DEFAULTS = {
   chartType: null
 };
@@ -733,8 +736,8 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   openDrilldownLink(drilldownLink, matchingRows) {
     let { data: { colIndexesByText }, templateSrv: { variables }, timeSrv: { time: timeVars } } = this;
     let { url, openInBlank } = drilldownLink;
-    url = url.replace(
-      /\$\{(time)(?:-(to|from))?\}|\$\{(col|var):((?:[^\}:\\]*|\\.)+)(?::(?:(raw)|(param)(?::((?:[^\}:\\]*|\\.)+))?))?\}/g,
+    url = url.replace(RGX_OLD_VAR_WORKAROUND, '$1$2').replace(
+      RGX_CELL_PLACEHOLDER,
       function (match, isTime, opt_timePart, type, name, isRaw, isParam, paramName) {
         if (isTime) {
           return (opt_timePart != 'to' ? 'from=' + encodeURIComponent(timeVars.from) : '')
@@ -764,7 +767,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
           : isRaw
             ? result.join(',')
             : isParam
-              ? result.map(v => encodeURIComponent(paramName == undefined ? name : paramName) + '=' + encodeURIComponent(v)).join('&')
+              ? result.map(v => encodeURIComponent(paramName == undefined ? type === 'var' ? `var-${name}` : name : paramName) + '=' + encodeURIComponent(v)).join('&')
               : encodeURIComponent(result.join(','));
       }
     );
