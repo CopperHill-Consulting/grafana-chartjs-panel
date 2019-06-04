@@ -79,6 +79,11 @@ var BAR_DEFAULTS = {
   dataBorderColorAlpha: 1,
   numberFormat: 'none',
   numberFormatDecimals: 0,
+  tooltip: {
+    isCustom: false,
+    titleFormat: null,
+    labelFormat: null
+  },
   legend: {
     isShowing: true,
     position: 'top',
@@ -320,6 +325,32 @@ function (_MetricsPanelCtrl) {
 
           break;
       }
+    } // ${col:dact:join(",")}
+
+  }, {
+    key: "formatTooltipText",
+    value: function formatTooltipText(strFormat, rowsByColName, series, category, measure) {
+      return strFormat.replace(/\$\{(?:(series)|(category)|(measure)|col:((?:[^\\\}:]+|\\.)+))(?::((?:[^\\\}]+|\\.)+))?\}/g, function (match, isSeries, isCategory, isMeasure, colName, code, matchIndex, str) {
+        var prevChar = matchIndex ? str.charAt(matchIndex - 1) : '';
+        colName = colName && colName.replace(/\\(.)/g, '$1');
+
+        if (prevChar !== '\\' && (!colName || _lodash.default.has(rowsByColName[0], colName))) {
+          match = isSeries ? series : isCategory ? category : isMeasure ? measure : rowsByColName.map(function (row) {
+            return row[colName];
+          });
+
+          if (code) {
+            code = code.replace(/(@)|(&)|'(?:[^\\']+|\\.)*'|"(?:[^\\"]+|\\.)*"/g, function (match, isAt, isAmpersand) {
+              return isAt ? '__arg1' : isAmpersand ? '__arg2' : match;
+            });
+            match = Function('__arg0,__arg1,__arg2', "with(__arg0){return ".concat(code, "}"))(_lodash.default.extend({}, _YourJS.default, _lodash.default), colName ? match[0] : match, match);
+          } else {
+            match = match.join(',');
+          }
+        }
+
+        return match;
+      });
     }
   }, {
     key: "addSeriesColor",
@@ -399,12 +430,18 @@ function (_MetricsPanelCtrl) {
         var colIndexesByText = columnTexts.reduceRight(function (indexes, colText, index) {
           return Object.assign(indexes, _defineProperty({}, colText, index));
         }, {});
+        var rowsByColName = rows.map(function (cells, rowIndex) {
+          return cells.reduce(function (carry, cellValue, cellIndex) {
+            return Object.assign(carry, _defineProperty({}, columnTexts[cellIndex], cellValue));
+          }, {});
+        });
         this.data = {
           type: type,
           columns: columns,
           rows: rows,
           columnTexts: columnTexts,
-          colIndexesByText: colIndexesByText
+          colIndexesByText: colIndexesByText,
+          rowsByColName: rowsByColName
         };
       } else {
         this.data = {};
@@ -540,6 +577,7 @@ function (_MetricsPanelCtrl) {
       var ctrl = this;
       var data = ctrl.data;
       var rows = data.rows,
+          rowsByColName = data.rowsByColName,
           colIndexesByText = data.colIndexesByText;
       var fullPanel = ctrl.panel;
       var panel = fullPanel.bar;
@@ -670,6 +708,15 @@ function (_MetricsPanelCtrl) {
               }),
               borderWidth: panel.borderWidth,
               stack: panel.isStacked ? seriesStacks[seriesNameIndex] : seriesNameIndex,
+              filteredRows: categories.map(function (category) {
+                return rows.reduce(function (carry, row, rowIndex) {
+                  if (row[categoryColIndex] === category && (seriesColIndex < 0 || row[seriesColIndex] === seriesName)) {
+                    carry.push(rowsByColName[rowIndex]);
+                  }
+
+                  return carry;
+                }, []);
+              }),
               data: categories.map(function (category) {
                 var sum = rows.reduce(function (sum, row) {
                   var isMatch = row[categoryColIndex] === category && (seriesColIndex < 0 || row[seriesColIndex] === seriesName);
@@ -686,21 +733,40 @@ function (_MetricsPanelCtrl) {
           tooltips: {
             mode: 'point',
             callbacks: {
-              title: function title(_ref) {
+              title: function title(_ref, data) {
                 var _ref2 = _slicedToArray(_ref, 1),
                     tooltipItem = _ref2[0];
 
                 if (!ignoreSeries) {
-                  return tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel'];
+                  var datasets = data.datasets,
+                      labels = data.labels;
+                  var dataset = datasets[tooltipItem.datasetIndex];
+                  var catName = labels[tooltipItem.index];
+                  var seriesName = dataset.label;
+                  var value = tooltipItem[panel.orientation === 'horizontal' ? 'xLabel' : 'yLabel'];
+                  var filteredRows = dataset.filteredRows[tooltipItem.index];
+                  var _panel$tooltip = panel.tooltip,
+                      isCustom = _panel$tooltip.isCustom,
+                      titleFormat = _panel$tooltip.titleFormat;
+                  return isCustom ? titleFormat ? ctrl.formatTooltipText(titleFormat, filteredRows, seriesName, catName, value) : null : tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel'];
                 }
               },
               label: function label(tooltipItem, data) {
+                var datasets = data.datasets,
+                    labels = data.labels;
+                var dataset = datasets[tooltipItem.datasetIndex];
+                var catName = labels[tooltipItem.index];
+                var seriesName = dataset.label;
                 var numberFormat = panel.numberFormat,
                     numberFormatDecimals = panel.numberFormatDecimals;
-                var label = ignoreSeries ? tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel'] : data.datasets[tooltipItem.datasetIndex].label;
+                var _panel$tooltip2 = panel.tooltip,
+                    isCustom = _panel$tooltip2.isCustom,
+                    labelFormat = _panel$tooltip2.labelFormat;
+                var label = ignoreSeries ? tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel'] : seriesName;
                 var value = tooltipItem[panel.orientation === 'horizontal' ? 'xLabel' : 'yLabel'];
-                value = !['none', null, void 0].includes(numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(numberFormat)(value, numberFormatDecimals, null) : value;
-                return label + ': ' + value;
+                var strValue = !['none', null, void 0].includes(numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(numberFormat)(value, numberFormatDecimals, null) : value;
+                var filteredRows = dataset.filteredRows[tooltipItem.index];
+                return isCustom && labelFormat ? ctrl.formatTooltipText(labelFormat, filteredRows, seriesName, catName, value) : label + ': ' + strValue;
               }
             }
           },

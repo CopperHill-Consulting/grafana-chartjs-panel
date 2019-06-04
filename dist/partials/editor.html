@@ -160,6 +160,32 @@
     </div>
   </div>
 </div>
+<div class="section gf-form-group">
+  <h5>Tooltips</h5>
+  <div ng-if="ctrl.isActiveOption('tooltip.isCustom')" class="gf-form">
+    <gf-form-switch class="gf-form" label="Is Custom" label-class="width-auto" checked="ctrl.getChartPanel().tooltip.isCustom" on-change="ctrl.renderNow()"></gf-form-switch>
+  </div>
+  <div ng-if="ctrl.getChartPanel().tooltip.isCustom">
+    <div class="gf-form">
+      <label class="gf-form-label width-auto">Title Format</label>
+      <input type="text"
+        class="gf-form-input width-max"
+        ng-model="ctrl.getChartPanel().tooltip.titleFormat"
+        placeholder="eg. ${category}"
+        ng-blur="ctrl.renderNow()"
+      />
+    </div>
+    <div class="gf-form">
+      <label class="gf-form-label width-auto">Label Format</label>
+      <input type="text"
+        class="gf-form-input width-max"
+        ng-model="ctrl.getChartPanel().tooltip.labelFormat"
+        placeholder="eg. ${series}: ${measure}"
+        ng-blur="ctrl.renderNow()"
+      />
+    </div>
+  </div>
+</div>
 <div ng-if="ctrl.isActiveOption('scales.xAxes')" class="section gf-form-group">
   <h5>X-Axis</h5>
   <div ng-if="ctrl.isActiveOption('scales.xAxes.ticks.autoSkip')" class="gf-form">

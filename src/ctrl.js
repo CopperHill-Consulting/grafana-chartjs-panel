@@ -35,6 +35,11 @@ const BAR_DEFAULTS = {
   dataBorderColorAlpha: 1,
   numberFormat: 'none',
   numberFormatDecimals: 0,
+  tooltip: {
+    isCustom: false,
+    titleFormat:  null,
+    labelFormat: null
+  },
   legend: {
     isShowing: true,
     position: 'top',
@@ -197,6 +202,43 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     }
   }
 
+  // ${col:dact:join(",")}
+  formatTooltipText(strFormat, rowsByColName, series, category, measure) {
+    return strFormat.replace(
+      /\$\{(?:(series)|(category)|(measure)|col:((?:[^\\\}:]+|\\.)+))(?::((?:[^\\\}]+|\\.)+))?\}/g,
+      function (match, isSeries, isCategory, isMeasure, colName, code, matchIndex, str) {
+        let prevChar = matchIndex ? str.charAt(matchIndex - 1) : '';
+        colName = colName && colName.replace(/\\(.)/g, '$1');
+        if (prevChar !== '\\' && (!colName || _.has(rowsByColName[0], colName))) {
+          match = isSeries
+            ? series
+            : isCategory
+              ? category
+              : isMeasure
+                ? measure
+                : rowsByColName.map(row => row[colName]);
+          if (code) {
+            code = code.replace(
+              /(@)|(&)|'(?:[^\\']+|\\.)*'|"(?:[^\\"]+|\\.)*"/g,
+              function (match, isAt, isAmpersand) {
+                return isAt ? '__arg1' : isAmpersand ? '__arg2' : match;
+              }
+            );
+            match = Function('__arg0,__arg1,__arg2', `with(__arg0){return ${code}}`)(
+              _.extend({}, JS, _),
+              colName ? match[0] : match,
+              match
+            );
+          }
+          else {
+            match = match.join(',');
+          }
+        }
+        return match;
+      }
+    )
+  }
+
   addSeriesColor(opt_index) {
     let panel = this.panel;
     let colors = panel[panel.chartType].seriesColors;
@@ -262,7 +304,14 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
           Object.assign(indexes, { [colText]: index }),
         {}
       );
-      this.data = { type, columns, rows, columnTexts, colIndexesByText };
+      let rowsByColName = rows.map(
+        (cells, rowIndex) =>
+          cells.reduce(
+            (carry, cellValue, cellIndex) => Object.assign(carry, { [columnTexts[cellIndex]]: cellValue }),
+            {}
+          )
+      );
+      this.data = { type, columns, rows, columnTexts, colIndexesByText, rowsByColName };
     }
     else {
       this.data = {};
@@ -356,7 +405,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   drawBarChart(canvas) {
     let ctrl = this;
     let data = ctrl.data;
-    let { rows, colIndexesByText } = data;
+    let { rows, rowsByColName, colIndexesByText } = data;
     let fullPanel = ctrl.panel;
     let panel = fullPanel.bar;
 
@@ -470,6 +519,17 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
           borderColor: baseColors[seriesNameIndex].map(color => color.a(panel.dataBorderColorAlpha).rgba()),
           borderWidth: panel.borderWidth,
           stack: panel.isStacked ? seriesStacks[seriesNameIndex] : seriesNameIndex,
+          filteredRows: categories.map(category => {
+            return rows.reduce(
+              (carry, row, rowIndex) => {
+                if (row[categoryColIndex] === category && (seriesColIndex < 0 || row[seriesColIndex] === seriesName)) {
+                  carry.push(rowsByColName[rowIndex]);
+                }
+                return carry;
+              },
+              []
+            );
+          }),
           data: categories.map(category => {
             let sum = rows.reduce((sum, row) => {
               let isMatch = row[categoryColIndex] === category
@@ -486,21 +546,42 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         tooltips: {
           mode: 'point',
           callbacks: {
-            title: function ([tooltipItem]) {
+            title: function ([tooltipItem], data) {
               if (!ignoreSeries) {
-                return tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel'];
+                let { datasets, labels } = data;
+                let dataset = datasets[tooltipItem.datasetIndex];
+                let catName = labels[tooltipItem.index];
+                let seriesName = dataset.label;
+                let value = tooltipItem[panel.orientation === 'horizontal' ? 'xLabel' : 'yLabel'];
+                let filteredRows = dataset.filteredRows[tooltipItem.index];
+                let { isCustom, titleFormat } = panel.tooltip;
+
+                return (isCustom)
+                  ? titleFormat
+                    ? ctrl.formatTooltipText(titleFormat, filteredRows, seriesName, catName, value)
+                    : null
+                  : tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel'];
               }
             },
             label: function (tooltipItem, data) {
+              let { datasets, labels } = data;
+              let dataset = datasets[tooltipItem.datasetIndex];
+              let catName = labels[tooltipItem.index];
+              let seriesName = dataset.label;
               let { numberFormat, numberFormatDecimals } = panel;
+              let { isCustom, labelFormat } = panel.tooltip;
               let label = ignoreSeries
                 ? tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel']
-                : data.datasets[tooltipItem.datasetIndex].label;
+                : seriesName;
               let value = tooltipItem[panel.orientation === 'horizontal' ? 'xLabel' : 'yLabel'];
-              value = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
+              let strValue = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
                   ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
                   : value;
-              return label + ': ' + value;
+              let filteredRows = dataset.filteredRows[tooltipItem.index];
+              
+              return (isCustom && labelFormat)
+                ? ctrl.formatTooltipText(labelFormat, filteredRows, seriesName, catName, value)
+                : (label + ': ' + strValue);
             }
           }
         },
