@@ -69,7 +69,7 @@ const BAR_OPTIONS = Object.keys(JS.flattenKeys(BAR_DEFAULTS, true));
 
 const FUNNEL_DEFAULTS = {
   hAlign: 'center',
-  sortOrder: 'asc',
+  sortOrder: 'desc',
   categoryColumnName: null,
   measureColumnName: null,
   drilldownLinks: [],
@@ -82,7 +82,7 @@ const FUNNEL_DEFAULTS = {
   numberFormat: 'none',
   numberFormatDecimals: 0,
   gap: 1,
-  startWidthPct: 0,
+  startWidthPct: 0.5,
   legend: {
     isShowing: true,
     position: 'top',
@@ -202,39 +202,46 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     }
   }
 
-  // ${col:dact:join(",")}
   formatTooltipText(strFormat, rowsByColName, series, category, measure) {
     return strFormat.replace(
-      /\$\{(?:(series)|(category)|(measure)|col:((?:[^\\\}:]+|\\.)+))(?::((?:[^\\\}]+|\\.)+))?\}/g,
-      function (match, isSeries, isCategory, isMeasure, colName, code, matchIndex, str) {
-        let prevChar = matchIndex ? str.charAt(matchIndex - 1) : '';
-        colName = colName && colName.replace(/\\(.)/g, '$1');
-        if (prevChar !== '\\' && (!colName || _.has(rowsByColName[0], colName))) {
-          match = isSeries
-            ? series
-            : isCategory
-              ? category
-              : isMeasure
-                ? measure
-                : rowsByColName.map(row => row[colName]);
-          if (code) {
-            code = code.replace(
-              /(@)|(&)|'(?:[^\\']+|\\.)*'|"(?:[^\\"]+|\\.)*"/g,
-              function (match, isAt, isAmpersand) {
-                return isAt ? '__arg1' : isAmpersand ? '__arg2' : match;
-              }
-            );
-            match = Function('__arg0,__arg1,__arg2', `with(__arg0){return ${code}}`)(
-              _.extend({}, JS, _),
-              colName ? match[0] : match,
-              match
-            );
-          }
-          else {
-            match = match.join(',');
+      /(\\\$)|\$\{(?:(series)|(category)|measure|col:((?:[^\\\}:]+|\\.)+)(?::([\-\w]+))?)\}/g,
+      function (match, isEscapedDollar, isSeries, isCategory, colName, colFnName) {
+        if (isEscapedDollar) {
+          match = '$';
+        }
+        else if (colName) {
+          colName = colName.replace(/\\(.)/g, '$1');
+          if (_.has(rowsByColName[0], colName)) {
+            match = rowsByColName.map(row => row[colName]);
+            match = colFnName === 'sum'
+              ? match.reduce((a, b) => a + b)
+              : colFnName === 'avg'
+                ? match.reduce((a, b) => a + b) / match.length
+                : colFnName === 'max'
+                  ? match.reduce((a, b) => a > b ? a : b)
+                  : colFnName === 'min'
+                    ? match.reduce((a, b) => a < b ? a : b)
+                    : colFnName === 'first'
+                      ? match[0]
+                      : colFnName === 'last'
+                        ? match[match.length - 1]
+                        : colFnName === 'count'
+                          ? match.length
+                          : colFnName === 'unique-count'
+                            ? new Set(match).size
+                            : colFnName === 'list'
+                              ? match.sort().reduce((a, b, c, d) => a + (c + 1 === d.length ? ' and ' : ', ') + b)
+                              : colFnName === 'unique-list'
+                                ? Array.from(new Set(match)).sort().reduce((a, b, c, d) => a + (c + 1 === d.length ? ' and ' : ', ') + b)
+                                : match.join(',');
           }
         }
-        return match;
+        else {
+          match = isSeries ? series : isCategory ? category : measure;
+        }
+        return 'number' === typeof match
+          ? (console.log(match), +match.toFixed(5))
+          : match;
       }
     )
   }

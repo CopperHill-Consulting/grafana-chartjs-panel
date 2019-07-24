@@ -160,9 +160,9 @@
     </div>
   </div>
 </div>
-<div class="section gf-form-group">
+<div class="section gf-form-group" ng-if="ctrl.isActiveOption('tooltip.isCustom')">
   <h5>Tooltips</h5>
-  <div ng-if="ctrl.isActiveOption('tooltip.isCustom')" class="gf-form">
+  <div class="gf-form">
     <gf-form-switch class="gf-form" label="Is Custom" label-class="width-auto" checked="ctrl.getChartPanel().tooltip.isCustom" on-change="ctrl.renderNow()"></gf-form-switch>
   </div>
   <div ng-if="ctrl.getChartPanel().tooltip.isCustom">

@@ -112,7 +112,7 @@ var BAR_DEFAULTS = {
 var BAR_OPTIONS = Object.keys(_YourJS.default.flattenKeys(BAR_DEFAULTS, true));
 var FUNNEL_DEFAULTS = {
   hAlign: 'center',
-  sortOrder: 'asc',
+  sortOrder: 'desc',
   categoryColumnName: null,
   measureColumnName: null,
   drilldownLinks: [],
@@ -125,7 +125,7 @@ var FUNNEL_DEFAULTS = {
   numberFormat: 'none',
   numberFormatDecimals: 0,
   gap: 1,
-  startWidthPct: 0,
+  startWidthPct: 0.5,
   legend: {
     isShowing: true,
     position: 'top',
@@ -325,31 +325,39 @@ function (_MetricsPanelCtrl) {
 
           break;
       }
-    } // ${col:dact:join(",")}
-
+    }
   }, {
     key: "formatTooltipText",
     value: function formatTooltipText(strFormat, rowsByColName, series, category, measure) {
-      return strFormat.replace(/\$\{(?:(series)|(category)|(measure)|col:((?:[^\\\}:]+|\\.)+))(?::((?:[^\\\}]+|\\.)+))?\}/g, function (match, isSeries, isCategory, isMeasure, colName, code, matchIndex, str) {
-        var prevChar = matchIndex ? str.charAt(matchIndex - 1) : '';
-        colName = colName && colName.replace(/\\(.)/g, '$1');
+      return strFormat.replace(/(\\\$)|\$\{(?:(series)|(category)|measure|col:((?:[^\\\}:]+|\\.)+)(?::([\-\w]+))?)\}/g, function (match, isEscapedDollar, isSeries, isCategory, colName, colFnName) {
+        if (isEscapedDollar) {
+          match = '$';
+        } else if (colName) {
+          colName = colName.replace(/\\(.)/g, '$1');
 
-        if (prevChar !== '\\' && (!colName || _lodash.default.has(rowsByColName[0], colName))) {
-          match = isSeries ? series : isCategory ? category : isMeasure ? measure : rowsByColName.map(function (row) {
-            return row[colName];
-          });
-
-          if (code) {
-            code = code.replace(/(@)|(&)|'(?:[^\\']+|\\.)*'|"(?:[^\\"]+|\\.)*"/g, function (match, isAt, isAmpersand) {
-              return isAt ? '__arg1' : isAmpersand ? '__arg2' : match;
+          if (_lodash.default.has(rowsByColName[0], colName)) {
+            match = rowsByColName.map(function (row) {
+              return row[colName];
             });
-            match = Function('__arg0,__arg1,__arg2', "with(__arg0){return ".concat(code, "}"))(_lodash.default.extend({}, _YourJS.default, _lodash.default), colName ? match[0] : match, match);
-          } else {
-            match = match.join(',');
+            match = colFnName === 'sum' ? match.reduce(function (a, b) {
+              return a + b;
+            }) : colFnName === 'avg' ? match.reduce(function (a, b) {
+              return a + b;
+            }) / match.length : colFnName === 'max' ? match.reduce(function (a, b) {
+              return a > b ? a : b;
+            }) : colFnName === 'min' ? match.reduce(function (a, b) {
+              return a < b ? a : b;
+            }) : colFnName === 'first' ? match[0] : colFnName === 'last' ? match[match.length - 1] : colFnName === 'count' ? match.length : colFnName === 'unique-count' ? new Set(match).size : colFnName === 'list' ? match.sort().reduce(function (a, b, c, d) {
+              return a + (c + 1 === d.length ? ' and ' : ', ') + b;
+            }) : colFnName === 'unique-list' ? Array.from(new Set(match)).sort().reduce(function (a, b, c, d) {
+              return a + (c + 1 === d.length ? ' and ' : ', ') + b;
+            }) : match.join(',');
           }
+        } else {
+          match = isSeries ? series : isCategory ? category : measure;
         }
 
-        return match;
+        return 'number' === typeof match ? (console.log(match), +match.toFixed(5)) : match;
       });
     }
   }, {

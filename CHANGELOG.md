@@ -1,5 +1,10 @@
 # Changelog
 
+- **v2.2.0**
+  - Added custom tooltips for bar charts.
+  - Make "Descending" the default sort order for funnel charts.
+  - Make 50% the default minimum width for funnel charts.
+
 - **v2.1.3**
   - Added some documentation for drilldown links.
   - Fixed `${var:nameOfVar:param}` so that it will evaluate to `var-nameOfVar=...`.
