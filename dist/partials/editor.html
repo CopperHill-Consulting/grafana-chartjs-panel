@@ -10,6 +10,20 @@
     </div>
   </div>
 
+  <div ng-if="ctrl.isActiveOption('pieType')" class="gf-form">
+    <span class="gf-form-label width-auto">Pie Type</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().pieType"
+        ng-options="ct.value as ct.text for ct in ctrl.PIE_TYPES"
+        ng-change="ctrl.setPanelDefaults() + ctrl.renderNow()"></select>
+    </div>
+  </div>
+
+  <div ng-if="ctrl.isActiveOption('isSemiCircle') && ctrl.getChartPanel().pieType !== 'polar'" class="gf-form">
+    <gf-form-switch class="gf-form" label="Show As Semi-circle" label-class="width-auto" checked="ctrl.getChartPanel().isSemiCircle" on-change="ctrl.renderNow()"></gf-form-switch>
+  </div>
+
   <div ng-if="ctrl.isActiveOption('hAlign')" class="gf-form">
     <span class="gf-form-label width-auto">Alignment</span>
     <div class="gf-form-select-wrapper width-auto">
@@ -157,6 +171,27 @@
           ng-change="ctrl.renderNow()">
         </select>
       </div>
+    </div>
+  </div>
+</div>
+<div class="section gf-form-group" ng-if="ctrl.isActiveOption('labels.isShowing')">
+  <h5>Labels</h5>
+  <div class="gf-form">
+    <gf-form-switch class="gf-form" label="Show Labels" label-class="width-auto" checked="ctrl.getChartPanel().labels.isShowing" on-change="ctrl.renderNow()"></gf-form-switch>
+  </div>
+  <div ng-if="ctrl.getChartPanel().labels.isShowing">
+    <div class="gf-form">
+      <span class="gf-form-label width-auto">Source</span>
+      <div class="gf-form-select-wrapper width-auto">
+        <select class="gf-form-input"
+          ng-model="ctrl.getChartPanel().labelColumnName"
+          ng-options="ct as (ct === null ? 'Value: Measure' : ('Column: ' + ct)) for ct in [null].concat(ctrl.data.columnTexts)"
+          ng-change="ctrl.renderNow()">
+        </select>
+      </div>
+    </div>
+    <div class="gf-form">
+      <gf-form-switch class="gf-form" label="Black On White" label-class="width-auto" checked="ctrl.getChartPanel().labels.isBlackText" on-change="ctrl.renderNow()"></gf-form-switch>
     </div>
   </div>
 </div>

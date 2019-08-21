@@ -1,5 +1,10 @@
 # Changelog
 
+- **v2.3.0**
+  - Added bar pie graphs
+  - Added doughnut graphs
+  - Added polar area graphs
+
 - **v2.2.0**
   - Added custom tooltips for bar charts.
   - Make "Descending" the default sort order for funnel charts.

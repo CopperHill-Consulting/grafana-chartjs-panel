@@ -134,8 +134,36 @@ var FUNNEL_DEFAULTS = {
   }
 };
 var FUNNEL_OPTIONS = Object.keys(_YourJS.default.flattenKeys(FUNNEL_DEFAULTS, true));
+var PIE_DEFAULTS = {
+  pieType: 'pie',
+  isSemiCircle: false,
+  categoryColumnName: null,
+  measureColumnName: null,
+  labelColumnName: null,
+  drilldownLinks: [],
+  borderWidth: 1,
+  colorSource: 'auto',
+  colorColumnName: null,
+  seriesColors: [],
+  dataBgColorAlpha: 0.75,
+  dataBorderColorAlpha: 1,
+  numberFormat: 'none',
+  numberFormatDecimals: 0,
+  labels: {
+    isShowing: true,
+    isBlackText: false
+  },
+  legend: {
+    isShowing: true,
+    position: 'top',
+    isFullWidth: false,
+    isReverse: false
+  }
+};
+var PIE_OPTIONS = Object.keys(_YourJS.default.flattenKeys(PIE_DEFAULTS, true));
 var OPTIONS_BY_TYPE = {
   bar: BAR_OPTIONS,
+  pie: PIE_OPTIONS,
   funnel: FUNNEL_OPTIONS
 };
 
@@ -238,6 +266,22 @@ function (_MetricsPanelCtrl) {
     }, {
       value: 'funnel',
       text: 'Funnel'
+    }, {
+      value: 'pie',
+      text: 'Pie'
+    }];
+    _this.PIE_TYPES = [{
+      value: null,
+      'text': '--- PICK ONE ---'
+    }, {
+      value: 'pie',
+      text: 'Default'
+    }, {
+      value: 'polar',
+      text: 'Polar'
+    }, {
+      value: 'doughnut',
+      text: 'Doughnut'
     }];
     _this.CHART_ORIENTATIONS = [{
       value: 'horizontal',
@@ -324,6 +368,11 @@ function (_MetricsPanelCtrl) {
           _lodash.default.defaultsDeep(panel.funnel = panel.funnel || {}, FUNNEL_DEFAULTS);
 
           break;
+
+        case 'pie':
+          _lodash.default.defaultsDeep(panel.pie = panel.pie || {}, PIE_DEFAULTS);
+
+          break;
       }
     }
   }, {
@@ -357,7 +406,7 @@ function (_MetricsPanelCtrl) {
           match = isSeries ? series : isCategory ? category : measure;
         }
 
-        return 'number' === typeof match ? (console.log(match), +match.toFixed(5)) : match;
+        return 'number' === typeof match ? +match.toFixed(5) : match;
       });
     }
   }, {
@@ -547,6 +596,8 @@ function (_MetricsPanelCtrl) {
             ctrl.drawBarChart(canvas);
           } else if ('funnel' === chartType) {
             ctrl.drawFunnelChart(canvas);
+          } else if ('pie' === chartType) {
+            ctrl.drawPieChart(canvas);
           }
 
           isValid = true;
@@ -577,6 +628,226 @@ function (_MetricsPanelCtrl) {
         });
 
         jContent.html('').append(elemMsg);
+      }
+    }
+  }, {
+    key: "drawPieChart",
+    value: function drawPieChart(canvas) {
+      var ctrl = this;
+      var data = ctrl.data;
+      var rows = data.rows,
+          colIndexesByText = data.colIndexesByText;
+      var fullPanel = ctrl.panel;
+      var panel = fullPanel.pie;
+      var categoryColIndex = ctrl.getColIndex('category', panel); // let seriesColIndex = ctrl.getColIndex('series', panel);
+
+      var measureColIndex = ctrl.getColIndex('measure', panel);
+      var labelColIndex = ctrl.getColIndex('label', panel, true);
+
+      var categories = _lodash.default.uniq(rows.map(function (row) {
+        return row[categoryColIndex];
+      })).reverse();
+
+      var measures = rows.reduce(function (measures, row, rowIndex) {
+        var measureIndex = categories.indexOf(row[categoryColIndex]);
+        measures[measureIndex] = (measures[measureIndex] || 0) + row[measureColIndex];
+        return measures;
+      }, []);
+      var labels = rows.reduce(function (labels, row, rowIndex) {
+        var labelIndex = categories.indexOf(row[categoryColIndex]);
+        labels[labelIndex] = labels[labelIndex] || row[labelColIndex];
+        return labels;
+      }, []);
+      var baseColors;
+      var colorSource = panel.colorSource,
+          seriesColors = panel.seriesColors,
+          colorColumnName = panel.colorColumnName,
+          sortOrder = panel.sortOrder;
+      var isLightTheme = _config.default.theme.type === 'light';
+
+      if (colorSource === 'column') {
+        if (!_lodash.default.has(colIndexesByText, colorColumnName)) {
+          throw new Error('Invalid color column.');
+        }
+
+        baseColors = categories.map(function (category) {
+          return (0, _CWestColor.Color)(rows.find(function (row) {
+            return row[categoryColIndex] === category;
+          })[colIndexesByText[colorColumnName]]);
+        });
+      } else if (colorSource === 'custom') {
+        baseColors = categories.map(function (category, index, categories) {
+          return (0, _CWestColor.Color)(seriesColors[index % seriesColors.length]);
+        });
+      } else {
+        baseColors = categories.map(function (category, index, categories) {
+          return _CWestColor.Color.hsl(~~(360 * index / categories.length), 1, 0.5);
+        });
+      } // Sort the measures and then the categories accordingly.
+
+
+      var altBaseColors;
+      measures = measures.map(function (value, index) {
+        return {
+          index: index,
+          value: value
+        };
+      }); //measures.sort(sortOrder === 'desc' ? (a, b) => b.value - a.value : (a, b) => a.value - b.value);
+
+      var _measures$reduce = measures.reduce(function (carry, measure, index) {
+        var _carry = _slicedToArray(carry, 3),
+            altBaseColors = _carry[0],
+            newCategories = _carry[1],
+            newMeasures = _carry[2];
+
+        altBaseColors.push(baseColors[measure.index]);
+        newCategories.push(categories[measure.index]);
+        newMeasures.push(measure.value);
+        return carry;
+      }, [[], [], []]);
+
+      var _measures$reduce2 = _slicedToArray(_measures$reduce, 3);
+
+      altBaseColors = _measures$reduce2[0];
+      categories = _measures$reduce2[1];
+      measures = _measures$reduce2[2];
+
+      // If using a column as the source of the colors make sure to order them according to the categories.
+      if (colorSource === 'column') {
+        baseColors = altBaseColors;
+      }
+
+      function testChartEvent(e, callback) {
+        var elem = this.getElementAtEvent(e)[0];
+        var isOpen;
+
+        if (elem) {
+          var category = categories[elem._index];
+          isOpen = panel.drilldownLinks.some(function (drilldownLink, drilldownLinkIndex) {
+            // Check this link to see if it matches...
+            var url = drilldownLink.url,
+                rgxCategory = drilldownLink.category;
+
+            if (url) {
+              rgxCategory = (0, _helperFunctions.parseRegExp)(rgxCategory);
+
+              if (rgxCategory.test(category)) {
+                callback(drilldownLinkIndex, rows.filter(function (row) {
+                  return row[categoryColIndex] === category;
+                }));
+                return true;
+              }
+            }
+          });
+        }
+
+        if (!isOpen) {
+          callback(-1, []);
+        }
+      } // Derive the background and border colors from the base colors.
+
+
+      var bgColors = baseColors.map(function (color) {
+        return color.a(panel.dataBgColorAlpha).rgba();
+      });
+      var borderColors = baseColors.map(function (color) {
+        return color.a(panel.dataBorderColorAlpha).rgba();
+      });
+      var dataset = {
+        label: categories,
+        data: measures,
+        borderWidth: panel.borderWidth,
+        borderColor: borderColors,
+        backgroundColor: bgColors,
+        datalabels: {
+          anchor: 'center',
+          display: 'auto',
+          backgroundColor: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
+          color: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'black' : 'white').rgb(),
+          borderRadius: 5,
+          formatter: function formatter(value, _ref) {
+            var dataIndex = _ref.dataIndex,
+                datasetIndex = _ref.datasetIndex;
+
+            if (labelColIndex < 0) {
+              var numberFormat = panel.numberFormat,
+                  numberFormatDecimals = panel.numberFormatDecimals;
+              var label = !['none', null, void 0].includes(numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(numberFormat)(value, numberFormatDecimals, null) : value;
+              return label;
+            }
+
+            return labels[dataIndex];
+          },
+          textAlign: 'center'
+        }
+      };
+      var chartConfig = {
+        responsive: true,
+        data: {
+          datasets: [dataset],
+          labels: 'string' === typeof dataset.label ? dataset.data.map(function (x, i) {
+            return "".concat(dataset.label, " #").concat(i + 1);
+          }) : dataset.label
+        },
+        options: {
+          circumference: (panel.isSemiCircle ? 1 : 2) * Math.PI,
+          rotation: -Math.PI / (panel.isSemiCircle ? 1 : 2),
+          elements: {
+            borderWidth: panel.borderWidth
+          },
+          tooltips: {
+            callbacks: {
+              label: function label(tooltipItem, data) {
+                var numberFormat = panel.numberFormat,
+                    numberFormatDecimals = panel.numberFormatDecimals;
+                var label = data.datasets[tooltipItem.datasetIndex].label[tooltipItem.index];
+                var value = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
+                value = !['none', null, void 0].includes(numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(numberFormat)(value, numberFormatDecimals, null) : value;
+                return label + ': ' + value;
+              }
+            }
+          },
+          legend: {
+            display: panel.legend.isShowing,
+            position: panel.legend.position,
+            fullWidth: panel.legend.isFullWidth,
+            reverse: panel.legend.isReverse,
+            labels: {
+              fontColor: isLightTheme ? '#333' : '#CCC'
+            }
+          },
+          animation: {
+            animateScale: true,
+            animateRotate: true
+          },
+          onClick: function onClick(e) {
+            testChartEvent.call(this, e, function (drilldownLinkIndex, matchingRows) {
+              if (drilldownLinkIndex >= 0) {
+                ctrl.openDrilldownLink(panel.drilldownLinks[drilldownLinkIndex], matchingRows);
+              }
+            });
+          },
+          hover: {
+            onHover: function onHover(e) {
+              testChartEvent.call(this, e, function (drilldownLinkIndex, matchingRows) {
+                e.target.style.cursor = drilldownLinkIndex >= 0 ? 'pointer' : 'default';
+              });
+            }
+          }
+        }
+      };
+
+      if (panel.labels.isShowing) {
+        chartConfig.plugins = [ChartDataLabels];
+      }
+
+      var ctx = canvas.getContext('2d');
+
+      if (panel.pieType === 'polar') {
+        Chart.PolarArea(ctx, chartConfig);
+      } else {
+        chartConfig.type = panel.pieType === 'doughnut' ? 'doughnut' : 'pie';
+        new Chart(ctx, chartConfig);
       }
     }
   }, {
@@ -741,9 +1012,9 @@ function (_MetricsPanelCtrl) {
           tooltips: {
             mode: 'point',
             callbacks: {
-              title: function title(_ref, data) {
-                var _ref2 = _slicedToArray(_ref, 1),
-                    tooltipItem = _ref2[0];
+              title: function title(_ref2, data) {
+                var _ref3 = _slicedToArray(_ref2, 1),
+                    tooltipItem = _ref3[0];
 
                 if (!ignoreSeries) {
                   var datasets = data.datasets,
@@ -869,17 +1140,17 @@ function (_MetricsPanelCtrl) {
           seriesColors = panel.seriesColors,
           colorColumnName = panel.colorColumnName,
           sortOrder = panel.sortOrder;
+      var isLightTheme = _config.default.theme.type === 'light';
 
       if (colorSource === 'column') {
         if (!_lodash.default.has(colIndexesByText, colorColumnName)) {
           throw new Error('Invalid color column.');
         }
 
-        var colorColIndex = colIndexesByText[colorColumnName];
         baseColors = categories.map(function (category) {
           return (0, _CWestColor.Color)(rows.find(function (row) {
             return row[categoryColIndex] === category;
-          })[colorColIndex]);
+          })[colIndexesByText[colorColumnName]]);
         });
       } else if (colorSource === 'custom') {
         baseColors = categories.map(function (category, index, categories) {
@@ -889,9 +1160,8 @@ function (_MetricsPanelCtrl) {
         baseColors = categories.map(function (category, index, categories) {
           return _CWestColor.Color.hsl(~~(360 * index / categories.length), 1, 0.5);
         });
-      }
+      } // Sort the measures and then the categories accordingly.
 
-      var isLightTheme = _config.default.theme.type === 'light'; // Sort the measures and then the categories accordingly.
 
       var altBaseColors;
       measures = measures.map(function (value, index) {
@@ -906,11 +1176,11 @@ function (_MetricsPanelCtrl) {
         return a.value - b.value;
       });
 
-      var _measures$reduce = measures.reduce(function (carry, measure, index) {
-        var _carry = _slicedToArray(carry, 3),
-            altBaseColors = _carry[0],
-            newCategories = _carry[1],
-            newMeasures = _carry[2];
+      var _measures$reduce3 = measures.reduce(function (carry, measure, index) {
+        var _carry2 = _slicedToArray(carry, 3),
+            altBaseColors = _carry2[0],
+            newCategories = _carry2[1],
+            newMeasures = _carry2[2];
 
         altBaseColors.push(baseColors[measure.index]);
         newCategories.push(categories[measure.index]);
@@ -918,11 +1188,11 @@ function (_MetricsPanelCtrl) {
         return carry;
       }, [[], [], []]);
 
-      var _measures$reduce2 = _slicedToArray(_measures$reduce, 3);
+      var _measures$reduce4 = _slicedToArray(_measures$reduce3, 3);
 
-      altBaseColors = _measures$reduce2[0];
-      categories = _measures$reduce2[1];
-      measures = _measures$reduce2[2];
+      altBaseColors = _measures$reduce4[0];
+      categories = _measures$reduce4[1];
+      measures = _measures$reduce4[2];
 
       // If using a column as the source of the colors make sure to order them according to the categories.
       if (colorSource === 'column') {

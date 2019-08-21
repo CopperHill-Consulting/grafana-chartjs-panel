@@ -92,8 +92,37 @@ const FUNNEL_DEFAULTS = {
 };
 const FUNNEL_OPTIONS = Object.keys(JS.flattenKeys(FUNNEL_DEFAULTS, true));
 
+const PIE_DEFAULTS = {
+  pieType: 'pie',
+  isSemiCircle: false,
+  categoryColumnName: null,
+  measureColumnName: null,
+  labelColumnName: null,
+  drilldownLinks: [],
+  borderWidth: 1,
+  colorSource: 'auto',
+  colorColumnName: null,
+  seriesColors: [],
+  dataBgColorAlpha: 0.75,
+  dataBorderColorAlpha: 1,
+  numberFormat: 'none',
+  numberFormatDecimals: 0,
+  labels: {
+    isShowing: true,
+    isBlackText: false
+  },
+  legend: {
+    isShowing: true,
+    position: 'top',
+    isFullWidth: false,
+    isReverse: false
+  }
+};
+const PIE_OPTIONS = Object.keys(JS.flattenKeys(PIE_DEFAULTS, true));
+
 const OPTIONS_BY_TYPE = {
   bar: BAR_OPTIONS,
+  pie: PIE_OPTIONS,
   funnel: FUNNEL_OPTIONS
 };
 
@@ -141,7 +170,14 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     this.CHART_TYPES = [
       { value: null, 'text': '--- PICK ONE ---' },
       { value: 'bar', text: 'Bar' },
-      { value: 'funnel', text: 'Funnel' }
+      { value: 'funnel', text: 'Funnel' },
+      { value: 'pie', text: 'Pie' }
+    ];
+    this.PIE_TYPES = [
+      { value: null, 'text': '--- PICK ONE ---' },
+      { value: 'pie', text: 'Default' },
+      { value: 'polar', text: 'Polar' },
+      { value: 'doughnut', text: 'Doughnut' }
     ];
     this.CHART_ORIENTATIONS = [
       { value: 'horizontal', text: 'Horizontal (\u2194)' },
@@ -199,6 +235,10 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       case 'funnel':
         _.defaultsDeep(panel.funnel = panel.funnel || {}, FUNNEL_DEFAULTS);
         break;
+
+      case 'pie':
+        _.defaultsDeep(panel.pie = panel.pie || {}, PIE_DEFAULTS);
+        break;
     }
   }
 
@@ -240,7 +280,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
           match = isSeries ? series : isCategory ? category : measure;
         }
         return 'number' === typeof match
-          ? (console.log(match), +match.toFixed(5))
+          ? +match.toFixed(5)
           : match;
       }
     )
@@ -392,6 +432,9 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         else if ('funnel' === chartType) {
           ctrl.drawFunnelChart(canvas);
         }
+        else if ('pie' === chartType) {
+          ctrl.drawPieChart(canvas);
+        }
         isValid = true;
       }
       catch (e) {
@@ -406,6 +449,193 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         ]
       });
       jContent.html('').append(elemMsg);
+    }
+  }
+
+  drawPieChart(canvas) {
+    let ctrl = this;
+    let { data } = ctrl;
+    let { rows, colIndexesByText } = data;
+    let fullPanel = ctrl.panel;
+    let panel = fullPanel.pie;
+
+    let categoryColIndex = ctrl.getColIndex('category', panel);
+    // let seriesColIndex = ctrl.getColIndex('series', panel);
+    let measureColIndex = ctrl.getColIndex('measure', panel);
+    let labelColIndex = ctrl.getColIndex('label', panel, true);
+
+    let categories = _.uniq(rows.map(row => row[categoryColIndex])).reverse();
+    let measures = rows.reduce((measures, row, rowIndex) => {
+      let measureIndex = categories.indexOf(row[categoryColIndex]);
+      measures[measureIndex] = (measures[measureIndex] || 0) + row[measureColIndex];
+      return measures;
+    }, []);
+    let labels = rows.reduce((labels, row, rowIndex) => {
+      let labelIndex = categories.indexOf(row[categoryColIndex]);
+      labels[labelIndex] = labels[labelIndex] || row[labelColIndex];
+      return labels;
+    }, []);
+
+    let baseColors;
+    let { colorSource, seriesColors, colorColumnName, sortOrder } = panel;
+    let isLightTheme = config.theme.type === 'light';
+
+    if (colorSource === 'column') {
+      if (!_.has(colIndexesByText, colorColumnName)) {
+        throw new Error('Invalid color column.');
+      }
+      baseColors = categories.map(category => Color(rows.find(row => row[categoryColIndex] === category)[colIndexesByText[colorColumnName]]));
+    }
+    else if (colorSource === 'custom') {
+      baseColors = categories.map((category, index, categories) => {
+        return Color(seriesColors[index % seriesColors.length]);
+      });
+    }
+    else {
+      baseColors = categories.map((category, index, categories) => {
+        return Color.hsl(~~(360 * index / categories.length), 1, 0.5);
+      });
+    }
+
+    // Sort the measures and then the categories accordingly.
+    let altBaseColors;
+    measures = measures.map((value, index) => ({ index, value }));
+    //measures.sort(sortOrder === 'desc' ? (a, b) => b.value - a.value : (a, b) => a.value - b.value);
+    [altBaseColors, categories, measures] = measures.reduce((carry, measure, index) => {
+      let [altBaseColors, newCategories, newMeasures] = carry;
+      altBaseColors.push(baseColors[measure.index]);
+      newCategories.push(categories[measure.index]);
+      newMeasures.push(measure.value);
+      return carry;
+    }, [[], [], []]);
+
+    // If using a column as the source of the colors make sure to order them according to the categories.
+    if (colorSource === 'column') {
+      baseColors = altBaseColors;
+    }
+
+    function testChartEvent(e, callback) {
+      let elem = this.getElementAtEvent(e)[0];
+      let isOpen;
+      if (elem) {
+        let category = categories[elem._index];
+        isOpen = panel.drilldownLinks.some((drilldownLink, drilldownLinkIndex) => {
+          // Check this link to see if it matches...
+          let { url, category: rgxCategory } = drilldownLink;
+          if (url) {
+            rgxCategory = parseRegExp(rgxCategory);
+            if (rgxCategory.test(category)) {
+              callback(
+                drilldownLinkIndex,
+                rows.filter(row => row[categoryColIndex] === category)
+              );
+              return true;
+            }
+          }
+        });
+      }
+
+      if (!isOpen) {
+        callback(-1, []);
+      }
+    }
+
+    // Derive the background and border colors from the base colors.
+    let bgColors = baseColors.map(color => color.a(panel.dataBgColorAlpha).rgba());
+    let borderColors = baseColors.map(color => color.a(panel.dataBorderColorAlpha).rgba());
+
+    let dataset = {
+      label: categories,
+      data: measures,
+      borderWidth: panel.borderWidth,
+      borderColor: borderColors,
+      backgroundColor: bgColors,
+      datalabels: {
+        anchor: 'center',
+        display: 'auto',
+        backgroundColor: Color(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
+        color: Color(panel.labels.isBlackText ? 'black' : 'white').rgb(),
+        borderRadius: 5,
+        formatter(value, { dataIndex, datasetIndex }) {
+          if (labelColIndex < 0) {
+            let { numberFormat, numberFormatDecimals } = panel;
+            let label = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
+              ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
+              : value;
+            return label;
+          }
+          return labels[dataIndex];
+        },
+        textAlign: 'center'
+      }
+    };
+
+    let chartConfig = {
+      responsive: true,
+      data: {
+        datasets: [dataset],
+        labels: 'string' === typeof dataset.label
+          ? dataset.data.map((x, i) => `${dataset.label} #${i + 1}`)
+          : dataset.label
+      },
+      options: {
+        circumference: (panel.isSemiCircle ? 1 : 2) * Math.PI,
+        rotation: -Math.PI / (panel.isSemiCircle ? 1 : 2),
+        elements: { borderWidth: panel.borderWidth },
+        tooltips: {
+          callbacks: {
+            label: function (tooltipItem, data) {
+              let { numberFormat, numberFormatDecimals } = panel;
+              let label = data.datasets[tooltipItem.datasetIndex].label[tooltipItem.index];
+              let value = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
+              value = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
+                ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
+                : value;
+              return label + ': ' + value;
+            }
+          }
+        },
+        legend: {
+          display: panel.legend.isShowing,
+          position: panel.legend.position,
+          fullWidth: panel.legend.isFullWidth,
+          reverse: panel.legend.isReverse,
+          labels: {
+            fontColor: isLightTheme ? '#333' : '#CCC'
+          }
+        },
+        animation: {
+          animateScale: true,
+          animateRotate: true
+        },
+        onClick: function (e) {
+          testChartEvent.call(this, e, (drilldownLinkIndex, matchingRows) => {
+            if (drilldownLinkIndex >= 0) {
+              ctrl.openDrilldownLink(panel.drilldownLinks[drilldownLinkIndex], matchingRows);
+            }
+          });
+        },
+        hover: {
+          onHover: function (e) {
+            testChartEvent.call(this, e, (drilldownLinkIndex, matchingRows) => {
+              e.target.style.cursor = drilldownLinkIndex >= 0 ? 'pointer' : 'default';
+            });
+          }
+        }
+      }
+    };
+
+    if (panel.labels.isShowing) {
+      chartConfig.plugins = [ChartDataLabels];
+    }
+
+    let ctx = canvas.getContext('2d');
+    if (panel.pieType === 'polar') {
+      Chart.PolarArea(ctx, chartConfig);
+    }
+    else {
+      chartConfig.type = panel.pieType === 'doughnut' ? 'doughnut' : 'pie';
+      new Chart(ctx, chartConfig);
     }
   }
 
@@ -684,12 +914,13 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
 
     let baseColors;
     let { colorSource, seriesColors, colorColumnName, sortOrder } = panel;
+    let isLightTheme = config.theme.type === 'light';
+
     if (colorSource === 'column') {
       if (!_.has(colIndexesByText, colorColumnName)) {
         throw new Error('Invalid color column.');
       }
-      let colorColIndex = colIndexesByText[colorColumnName];
-      baseColors = categories.map(category => Color(rows.find(row => row[categoryColIndex] === category)[colorColIndex]));
+      baseColors = categories.map(category => Color(rows.find(row => row[categoryColIndex] === category)[colIndexesByText[colorColumnName]]));
     }
     else if (colorSource === 'custom') {
       baseColors = categories.map((category, index, categories) => {
@@ -701,8 +932,6 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         return Color.hsl(~~(360 * index / categories.length), 1, 0.5);
       });
     }
-
-    let isLightTheme = config.theme.type === 'light';
 
     // Sort the measures and then the categories accordingly.
     let altBaseColors;

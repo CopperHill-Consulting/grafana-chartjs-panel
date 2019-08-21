@@ -4,7 +4,7 @@
   "id": "westc-chartjs-panel",
 
   "info": {
-    "description": "Use Chart.js to add bar charts and funnel charts to Grafana.",
+    "description": "Use Chart.js to add bar graphs, funnel graphs, pie graphs, doughnut graphs and polar area graphs to Grafana.",
     "author": {
       "name": "Chris West",
       "url": "https://github.com/westc/"
@@ -17,8 +17,8 @@
     "links": [
       {"name": "Project site", "url": "https://github.com/CopperHill-Consulting/grafana-chartjs-panel.git"}
     ],
-    "version": "2.2.0",
-    "updated": "2019-07-23"
+    "version": "2.3.0",
+    "updated": "2019-08-20"
   },
 
   "dependencies": {

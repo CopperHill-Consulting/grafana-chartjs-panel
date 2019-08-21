@@ -1,6 +1,6 @@
 ## Chart.js Panel Plugin for Grafana
 
-Create bar charts in Grafana using Chart.js.
+Create bar graphs, funnel graphs, pie graphs, doughnut graphs and polar area graphs in Grafana using Chart.js.
 
 ## Installation
 
@@ -85,9 +85,9 @@ If the custom tooltips section is available, you can use any of the following me
 
    - **`unique-count`** (eg. `${col:section:unique-count}`):  This will use the number of unique values in the specified column as the value of the meta group.
 
-   - **`count`** (eg. `${col:positionOrStage:list}`):  This will concatenate all of the (sorted) values of the specified column with a comma and a space with the exception of the last value being concatenated to the values with the word "and" surrounded by spaces.  The concatenated list will serve as the value of the meta group.
+   - **`list`** (eg. `${col:positionOrStage:list}`):  This will concatenate all of the (sorted) values of the specified column with a comma and a space with the exception of the last value being concatenated to the values with the word "and" surrounded by spaces.  The concatenated list will serve as the value of the meta group.
 
-   - **`unique-count`** (eg. `${col:positionOrStage:unique-list}`):  This will concatenate all of the unique (sorted) values of the specified column with a comma and a space with the exception of the last value being concatenated to the values with the word "and" surrounded by spaces.  The concatenated list will serve as the value of the meta group.
+   - **`unique-list`** (eg. `${col:positionOrStage:unique-list}`):  This will concatenate all of the unique (sorted) values of the specified column with a comma and a space with the exception of the last value being concatenated to the values with the word "and" surrounded by spaces.  The concatenated list will serve as the value of the meta group.
 
 ## License
 MIT

@@ -1,6 +1,6 @@
 ## Chart.js Panel Plugin for Grafana
 
-Create bar charts in Grafana using Chart.js.
+Create bar graphs, funnel graphs, pie graphs, doughnut graphs and polar area graphs in Grafana using Chart.js.
 
 ## Installation
 
