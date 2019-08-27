@@ -11,8 +11,17 @@ import { Color } from './external/CWest-Color.min';
 
 import { parseRegExp, wrapText } from './helper-functions';
 
+const IS_LIGHT_THEME = config.theme.type === 'light'
+
 const RGX_CELL_PLACEHOLDER = /\$\{(time)(?:-(to|from))?\}|\$\{(col|var):((?:[^\}:\\]*|\\.)+)(?::(?:(raw)|(param)(?::((?:[^\}:\\]*|\\.)+))?))?\}/g;
 const RGX_OLD_VAR_WORKAROUND = /([\?&])var-(\$\{var:(?:[^\}:\\]*|\\.)+:param\})/g;
+
+const COUNT_TYPE_MAP = {
+  sum: _.sum,
+  avg: _.mean,
+  min: _.min,
+  max: _.max
+};
 
 const PANEL_DEFAULTS = {
   chartType: null
@@ -66,7 +75,6 @@ const BAR_DEFAULTS = {
     }
   }
 };
-const BAR_OPTIONS = Object.keys(JS.flattenKeys(BAR_DEFAULTS, true));
 
 const FUNNEL_DEFAULTS = {
   hAlign: 'center',
@@ -92,7 +100,6 @@ const FUNNEL_DEFAULTS = {
     isReverse: false
   }
 };
-const FUNNEL_OPTIONS = Object.keys(JS.flattenKeys(FUNNEL_DEFAULTS, true));
 
 const PIE_DEFAULTS = {
   pieType: 'pie',
@@ -124,12 +131,11 @@ const PIE_DEFAULTS = {
     isReverse: false
   }
 };
-const PIE_OPTIONS = Object.keys(JS.flattenKeys(PIE_DEFAULTS, true));
 
 const OPTIONS_BY_TYPE = {
-  bar: BAR_OPTIONS,
-  pie: PIE_OPTIONS,
-  funnel: FUNNEL_OPTIONS
+  bar: Object.keys(JS.flattenKeys(BAR_DEFAULTS, true)),
+  pie: Object.keys(JS.flattenKeys(PIE_DEFAULTS, true)),
+  funnel: Object.keys(JS.flattenKeys(FUNNEL_DEFAULTS, true))
 };
 
 export class ChartJsPanelCtrl extends MetricsPanelCtrl {
@@ -461,41 +467,56 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     }
   }
 
-  drawPieChart(canvas) {
+  getChartOptions(chartType) {
     let ctrl = this;
     let { data } = ctrl;
     let { rows, colIndexesByText } = data;
     let fullPanel = ctrl.panel;
-    let panel = fullPanel.pie;
+    let panel = fullPanel[chartType];
+    let { colorSource, seriesColors, colorColumnName, colorBy, sortOrder } = panel;
+
+    let countType = panel.countType || 'sum';
 
     let categoryColIndex = ctrl.getColIndex('category', panel);
     let seriesColIndex = panel.pieType === 'polar' ? -1 : ctrl.getColIndex('series', panel, true);
     let measureColIndex = ctrl.getColIndex('measure', panel);
     let labelColIndex = ctrl.getColIndex('label', panel, true);
-    let colorColIndex = ctrl.getColIndex('color', panel, true);
+    let colorColIndex = colorBy === 'column' ? ctrl.getColIndex('color', panel, true) : -1;
+    let stackColIndex = ctrl.getColIndex('stack', panel, true);
     let ignoreSeries = seriesColIndex < 0;
 
-    let categories = _.uniq(rows.map(row => row[categoryColIndex])).reverse();
-    let series = _.uniq(rows.map(row => row[seriesColIndex])).reverse();
+    let categories = _.uniq(rows.map(row => row[categoryColIndex]));
+    let series = _.uniq(rows.map(row => row[seriesColIndex]));
+    if (chartType === 'pie') {
+      categories.reverse();
+      series.reverse();
+    }
+
     let categoryCount = categories.length;
     let seriesCount = series.length;
     let measureCount = categoryCount * seriesCount;
-    let { measures, labels, colors } = rows.reduce((carry, row, rowIndex) => {
-      let category = row[categoryColIndex];
-      let categoryIndex = categories.indexOf(category);
-      let seriesName = row[seriesColIndex];
-      let seriesIndex = series.indexOf(seriesName);
-      let index = categoryIndex + seriesIndex * categoryCount;
-      carry.measures[index] = (carry.measures[index] || 0) + row[measureColIndex];
+    let { measures, labels, colors, rowsByMeasure, seriesStacks } = rows.reduce((carry, row, rowIndex) => {
+      let seriesIndex = series.indexOf(row[seriesColIndex]);
+      let index = categories.indexOf(row[categoryColIndex]) + seriesIndex * categoryCount;
+      (carry.measures[index] = carry.measures[index] || []).push(row[measureColIndex]);
+      (carry.rowsByMeasure[index] = carry.rowsByMeasure[index] || []).push(row);
       carry.labels[index] = carry.labels[index] || row[labelColIndex];
       carry.colors[index] = carry.colors[index] || row[colorColIndex];
+      carry.seriesStacks[seriesIndex] = carry.seriesStacks[seriesIndex] || row[stackColIndex];
       return carry;
-    }, { measures: [], labels: [], colors: [] });
+    }, { measures: [], labels: [], colors: [], rowsByMeasure: [], seriesStacks: [] });
+
+    let countMeasures = COUNT_TYPE_MAP[countType];
+    if (!countMeasures) {
+      throw new Error(`Unknown count type:\t${countType}`);
+    }
+    for (let i = measureCount; i--; ) {
+      measures[i] = countMeasures(measures[i] || [0]);
+      rowsByMeasure[i] = rowsByMeasure[i] || [];
+    }
 
     let baseColors;
-    let { colorSource, seriesColors, colorColumnName, colorBy, sortOrder } = panel;
     let seriesColorCount = seriesColors.length;
-    let isLightTheme = config.theme.type === 'light';
 
     if (colorSource === 'column') {
       if (!_.has(colIndexesByText, colorColumnName)) {
@@ -530,61 +551,111 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       }
     }
 
-    function testChartEvent(e, callback) {
-      let elem = this.getElementAtEvent(e)[0];
-      let isOpen;
-      if (elem) {
-        let category = categories[elem._index];
-        isOpen = panel.drilldownLinks.some((drilldownLink, drilldownLinkIndex) => {
-          // Check this link to see if it matches...
-          let { url, category: rgxCategory } = drilldownLink;
-          if (url) {
-            rgxCategory = parseRegExp(rgxCategory);
-            if (rgxCategory.test(category)) {
-              callback(
-                drilldownLinkIndex,
-                rows.filter(row => row[categoryColIndex] === category)
-              );
-              return true;
-            }
-          }
-        });
-      }
-
-      if (!isOpen) {
-        callback(-1, []);
-      }
-    }
-
     // Derive the background and border colors from the base colors.
-    let bgColors = baseColors.map(color => color.a(panel.dataBgColorAlpha).rgba());
-    let borderColors = baseColors.map(color => color.l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba());
+    let bgColors = baseColors.map(color => Color(color).a(panel.dataBgColorAlpha).rgba());
+    let borderColors = baseColors.map(color => Color(color).l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba());
 
-    let datasets = series.map((seriesName, seriesIndex) => ({
-      label: categories,
-      data: measures.filter((measure, measureIndex) => ~~(measureIndex / categoryCount) === seriesIndex),
-      borderWidth: panel.borderWidth,
-      borderColor: borderColors.filter((measure, measureIndex) => ~~(measureIndex / categoryCount) === seriesIndex),
-      backgroundColor: bgColors.filter((measure, measureIndex) => ~~(measureIndex / categoryCount) === seriesIndex),
-      datalabels: {
-        anchor: 'center',
-        display: 'auto',
-        backgroundColor: Color(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
-        color: Color(panel.labels.isBlackText ? 'black' : 'white').rgb(),
-        borderRadius: 5,
-        formatter(value, { dataIndex, datasetIndex }) {
-          let result = labels[dataIndex + datasetIndex * categoryCount];
-          if (labelColIndex < 0) {
-            let { numberFormat, numberFormatDecimals } = panel;
-            result = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
-              ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
-              : value;
-          }
-          return wrapText(`${result}`, panel.labels.wrapAfter);
-        },
-        textAlign: 'center'
+    return {
+      ctrl,
+      data,
+      rows,
+      colIndexesByText,
+      fullPanel,
+      panel,
+      countType,
+      categoryColIndex,
+      seriesColIndex,
+      measureColIndex,
+      labelColIndex,
+      colorColIndex,
+      stackColIndex,
+      seriesStacks,
+      ignoreSeries,
+      categories,
+      series,
+      categoryCount,
+      seriesCount,
+      measures,
+      measureCount,
+      labels,
+      rowsByMeasure,
+      baseColors,
+      bgColors,
+      borderColors,
+      sortOrder,
+      testChartEvent(e, callback) {
+        let elem = this.getElementAtEvent(e)[0];
+        let isOpen;
+        if (elem) {
+          let { _datasetIndex: seriesIndex, _index: categoryIndex } = elem;
+          let category = categories[categoryIndex];
+          let seriesName = series[seriesIndex];
+          isOpen = panel.drilldownLinks.some((drilldownLink, drilldownLinkIndex) => {
+            // Check this link to see if it matches...
+            let { url, category: rgxCategory, series: rgxSeries } = drilldownLink;
+            if (url) {
+              if (parseRegExp(rgxCategory).test(category) && (ignoreSeries || parseRegExp(rgxSeries).test(seriesName))) {
+                callback(
+                  drilldownLinkIndex,
+                  rowsByMeasure[categoryIndex + seriesIndex * categoryCount]
+                );
+                return true;
+              }
+            }
+          });
+        }
+
+        if (!isOpen) {
+          callback(-1, []);
+        }
       }
-    }));
+    };
+  }
+
+  drawPieChart(canvas) {
+    let {
+      ctrl,
+      panel,
+      labelColIndex,
+      colorColIndex,
+      categories,
+      series,
+      categoryCount,
+      measures,
+      labels,
+      bgColors,
+      borderColors,
+      testChartEvent
+    } = this.getChartOptions('pie');
+
+    let datasets = series.map((seriesName, seriesIndex) => {
+      let fnFilter = (measure, measureIndex) => ~~(measureIndex / categoryCount) === seriesIndex;
+      return {
+        label: categories,
+        data: measures.filter(fnFilter),
+        borderWidth: panel.borderWidth,
+        borderColor: borderColors.filter(fnFilter),
+        backgroundColor: bgColors.filter(fnFilter),
+        datalabels: {
+          anchor: 'center',
+          display: 'auto',
+          backgroundColor: Color(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
+          color: Color(panel.labels.isBlackText ? 'black' : 'white').rgb(),
+          borderRadius: 5,
+          formatter(value, { dataIndex, datasetIndex }) {
+            let result = labels[dataIndex + datasetIndex * categoryCount];
+            if (labelColIndex < 0) {
+              let { numberFormat, numberFormatDecimals } = panel;
+              result = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
+                ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
+                : value;
+            }
+            return wrapText(`${result}`, panel.labels.wrapAfter);
+          },
+          textAlign: 'center'
+        }
+      };
+    });
 
     let chartConfig = {
       responsive: true,
@@ -620,7 +691,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
           fullWidth: panel.legend.isFullWidth,
           reverse: panel.legend.isReverse,
           labels: {
-            fontColor: isLightTheme ? '#333' : '#CCC'
+            fontColor: IS_LIGHT_THEME ? '#333' : '#CCC'
           }
         },
         animation: {
@@ -659,142 +730,61 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   }
 
   drawBarChart(canvas) {
-    let ctrl = this;
-    let data = ctrl.data;
-    let { rows, rowsByColName, colIndexesByText } = data;
-    let fullPanel = ctrl.panel;
-    let panel = fullPanel.bar;
-
-    let categoryColIndex = ctrl.getColIndex('category', panel);
-    let seriesColIndex = ctrl.getColIndex('series', panel, true);
-    let stackColIndex = ctrl.getColIndex('stack', panel, true);
-    let measureColIndex = ctrl.getColIndex('measure', panel);
-    let ignoreSeries = seriesColIndex < 0;
-
-    let categories = _.uniq(rows.map(row => row[categoryColIndex]));
-    let { series, seriesStacks } = rows.reduce(
-      (carry, row) => {
-        let seriesName = row[seriesColIndex];
-        if (!carry.series.includes(seriesName)) {
-          carry.series.push(seriesName);
-          carry.seriesStacks.push(row[stackColIndex]);
-        }
-        return carry;
-      },
-      { series: [], seriesStacks: [] }
-    );
-
-    series = series.map(name => name === undefined ? 'Series' : name);
-    seriesStacks = seriesStacks.map(name => name === undefined ? 'Stack' : name);
+    // TODO: Remove unused variables
+    let {
+      ctrl,
+      data,
+      rows,
+      colIndexesByText,
+      fullPanel,
+      panel,
+      countType,
+      categoryColIndex,
+      seriesColIndex,
+      measureColIndex,
+      labelColIndex,
+      colorColIndex,
+      stackColIndex,
+      seriesStacks,
+      ignoreSeries,
+      categories,
+      series,
+      categoryCount,
+      seriesCount,
+      measures,
+      measureCount,
+      labels,
+      rowsByMeasure,
+      baseColors,
+      bgColors,
+      borderColors,
+      sortOrder,
+      testChartEvent
+    } = this.getChartOptions('bar');
 
     // If legacy bar chart colors exist convert them to new color setup
     if (_.has(panel, ['seriesColors', 0, 'text'])) {
       panel.seriesColors = panel.seriesColors.map(color => color.color);
       panel.colorSource = 'custom';
     }
-
-    let { colorSource, seriesColors, colorColumnName, colorBy } = panel;
-
-    let colorColIndex;
-    if (colorSource === 'column') {
-       colorColIndex = ctrl.getColIndex('color', panel);
-    }
-
-    let rowCount = rows.length;
     
-    let colorCount = colorBy === 'category'
-      ? categories.length
-      : colorBy === 'both'
-        ? categories.length * series.length
-        : series.length;
-    let baseColors = series.map((seriesName, seriesIndex) => {
-      return categories.map((catName, catIndex) => {
-        if (colorSource === 'column' && colorColIndex >= 0) { // column
-          for (let row, rowIndex = 0; rowIndex < rowCount; rowIndex++) {
-            row = rows[rowIndex];
-            if ((seriesColIndex < 0 || row[seriesColIndex] === seriesName) && row[categoryColIndex] === catName) {
-              return Color(row[colorColIndex]);
-            }
-          }
-        }
-        else {
-          let index = colorBy === 'category'
-            ? catIndex
-            : colorBy === 'both'
-              ? catIndex + categories.length * seriesIndex
-              : seriesIndex;
-          if (colorSource === 'custom') { // user-defined
-            return Color(seriesColors[index % seriesColors.length]);
-          }
-          else { // rainbow (default)
-            return Color.hsl(~~(360 * index / colorCount), 1, 0.5);
-          }
-        }
-      });
+    let datasets = series.map((seriesName, seriesIndex) => {
+      let fnFilter = (measure, measureIndex) => ~~(measureIndex / categoryCount) === seriesIndex;
+      return {
+        label: seriesName,
+        data: measures.filter(fnFilter),
+        borderWidth: panel.borderWidth,
+        borderColor: borderColors.filter(fnFilter),
+        backgroundColor: bgColors.filter(fnFilter),
+        stack: panel.isStacked ? seriesStacks[seriesIndex] : seriesIndex
+      };
     });
-
-    function testChartEvent(e, callback) {
-      let target = this.getElementAtEvent(e)[0];
-      let model = target && target._model;
-      let isOpen;
-      if (model) {
-        let category = model.label;
-        let seriesName = model.datasetLabel;
-        isOpen = panel.drilldownLinks.some((drilldownLink, drilldownLinkIndex) => {
-          // Check this link to see if it matches...
-          let { url, category: rgxCategory, series: rgxSeries } = drilldownLink;
-          if (url) {
-            rgxCategory = parseRegExp(rgxCategory);
-            rgxSeries = !ignoreSeries && parseRegExp(rgxSeries);
-            if (rgxCategory.test(category) && (ignoreSeries || rgxSeries.test(seriesName))) {
-              callback(
-                drilldownLinkIndex,
-                rows.filter(row => row[categoryColIndex] === category && (ignoreSeries || row[seriesColIndex] === seriesName))
-              );
-              return true;
-            }
-          }
-        });
-      }
-
-      if (!isOpen) {
-        callback(-1, []);
-      }
-    }
     
-    let isLightTheme = config.theme.type === 'light';
-    
-    let measures = {};
     let chartConfig = {
       type: panel.orientation === 'horizontal' ? 'horizontalBar' : 'bar',
       data: {
-        labels: categories,
-        datasets: series.map((seriesName, seriesNameIndex) => ({
-          label: seriesName,
-          backgroundColor: baseColors[seriesNameIndex].map(color => color.a(panel.dataBgColorAlpha).rgba()),
-          borderColor: baseColors[seriesNameIndex].map(color => color.l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba()),
-          borderWidth: panel.borderWidth,
-          stack: panel.isStacked ? seriesStacks[seriesNameIndex] : seriesNameIndex,
-          filteredRows: categories.map(category => {
-            return rows.reduce(
-              (carry, row, rowIndex) => {
-                if (row[categoryColIndex] === category && (seriesColIndex < 0 || row[seriesColIndex] === seriesName)) {
-                  carry.push(rowsByColName[rowIndex]);
-                }
-                return carry;
-              },
-              []
-            );
-          }),
-          data: categories.map(category => {
-            let sum = rows.reduce((sum, row) => {
-              let isMatch = row[categoryColIndex] === category
-                && (seriesColIndex < 0 || row[seriesColIndex] === seriesName);
-              return sum + (isMatch ? +row[measureColIndex] || 0 : 0);
-            }, 0);
-            return (measures[category] = measures[category] || {})[seriesName] = sum;
-          })
-        }))
+        datasets,
+        labels: categories
       },
       //plugins: [ChartDataLabels],
       options: {
@@ -805,39 +795,38 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
             title: function ([tooltipItem], data) {
               if (!ignoreSeries) {
                 let { datasets, labels } = data;
-                let dataset = datasets[tooltipItem.datasetIndex];
-                let catName = labels[tooltipItem.index];
-                let seriesName = dataset.label;
-                let value = tooltipItem[panel.orientation === 'horizontal' ? 'xLabel' : 'yLabel'];
-                let filteredRows = dataset.filteredRows[tooltipItem.index];
+                let { datasetIndex: seriesIndex, index: categoryIndex } = tooltipItem;
+                let category = categories[categoryIndex];
+                let seriesName = series[seriesIndex];
+                let measureIndex = categoryIndex + seriesIndex * categoryCount;
+                let measure = measures[measureIndex];
+                let rows = rowsByMeasure[measureIndex];
                 let { isCustom, titleFormat } = panel.tooltip;
 
                 return (isCustom)
                   ? titleFormat
-                    ? ctrl.formatTooltipText(titleFormat, filteredRows, seriesName, catName, value)
+                    ? ctrl.formatTooltipText(titleFormat, rows, seriesName, category, measure)
                     : null
-                  : tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel'];
+                  : seriesName;
               }
             },
             label: function (tooltipItem, data) {
               let { datasets, labels } = data;
-              let dataset = datasets[tooltipItem.datasetIndex];
-              let catName = labels[tooltipItem.index];
-              let seriesName = dataset.label;
+              let { datasetIndex: seriesIndex, index: categoryIndex } = tooltipItem;
+              let category = categories[categoryIndex];
+              let seriesName = series[seriesIndex];
+              let measureIndex = categoryIndex + seriesIndex * categoryCount;
+              let measure = measures[measureIndex];
+              let rows = rowsByMeasure[measureIndex];
               let { numberFormat, numberFormatDecimals } = panel;
               let { isCustom, labelFormat } = panel.tooltip;
-              let label = ignoreSeries
-                ? tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel']
-                : seriesName;
-              let value = tooltipItem[panel.orientation === 'horizontal' ? 'xLabel' : 'yLabel'];
-              let strValue = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
-                  ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
-                  : value;
-              let filteredRows = dataset.filteredRows[tooltipItem.index];
+              let strMeasure = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof measure)
+                  ? getValueFormat(numberFormat)(measure, numberFormatDecimals, null)
+                  : measure;
               
               return (isCustom && labelFormat)
-                ? ctrl.formatTooltipText(labelFormat, filteredRows, seriesName, catName, value)
-                : (label + ': ' + strValue);
+                ? ctrl.formatTooltipText(labelFormat, rows, seriesName, category, measure)
+                : (category + ': ' + strMeasure);
             }
           }
         },
@@ -847,7 +836,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
           fullWidth: panel.legend.isFullWidth,
           reverse: panel.legend.isReverse,
           labels: {
-            fontColor: isLightTheme ? '#333' : '#CCC'
+            fontColor: IS_LIGHT_THEME ? '#333' : '#CCC'
           }
         },
         scales: {
@@ -857,7 +846,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
                 autoSkip: panel.scales.xAxes.ticks.autoSkip,
                 minRotation: panel.scales.xAxes.ticks.minRotation,
                 maxRotation: panel.scales.xAxes.ticks.maxRotation,
-                fontColor: isLightTheme ? '#333' : '#CCC',
+                fontColor: IS_LIGHT_THEME ? '#333' : '#CCC',
                 userCallback: function (value, index, values) {
                   let { numberFormat, numberFormatDecimals } = panel;
                   return (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
@@ -868,7 +857,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
               stacked: true,
               gridLines: {
                 display: !!panel.scales.xAxes.gridLineOpacity,
-                color: isLightTheme ? `rgba(0,0,0,${+panel.scales.xAxes.gridLineOpacity})` : `rgba(255,255,255,${+panel.scales.xAxes.gridLineOpacity})`
+                color: IS_LIGHT_THEME ? `rgba(0,0,0,${+panel.scales.xAxes.gridLineOpacity})` : `rgba(255,255,255,${+panel.scales.xAxes.gridLineOpacity})`
               }
             }
           ],
@@ -878,7 +867,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
                 autoSkip: panel.scales.yAxes.ticks.autoSkip,
                 minRotation: panel.scales.yAxes.ticks.minRotation,
                 maxRotation: panel.scales.yAxes.ticks.maxRotation,
-                fontColor: isLightTheme ? '#333' : '#CCC',
+                fontColor: IS_LIGHT_THEME ? '#333' : '#CCC',
                 userCallback: function (value, index, values) {
                   let { numberFormat, numberFormatDecimals } = panel;
                   return (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
@@ -889,7 +878,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
               stacked: true,
               gridLines: {
                 display: !!panel.scales.yAxes.gridLineOpacity,
-                color: isLightTheme ? `rgba(0,0,0,${+panel.scales.yAxes.gridLineOpacity})` : `rgba(255,255,255,${+panel.scales.yAxes.gridLineOpacity})`
+                color: IS_LIGHT_THEME ? `rgba(0,0,0,${+panel.scales.yAxes.gridLineOpacity})` : `rgba(255,255,255,${+panel.scales.yAxes.gridLineOpacity})`
               }
             }
           ]
@@ -933,7 +922,6 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
 
     let baseColors;
     let { colorSource, seriesColors, colorColumnName, sortOrder } = panel;
-    let isLightTheme = config.theme.type === 'light';
 
     if (colorSource === 'column') {
       if (!_.has(colIndexesByText, colorColumnName)) {
@@ -1042,7 +1030,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
           fullWidth: panel.legend.isFullWidth,
           reverse: panel.legend.isReverse,
           labels: {
-            fontColor: isLightTheme ? '#333' : '#CCC'
+            fontColor: IS_LIGHT_THEME ? '#333' : '#CCC'
           }
         },
         animation: {

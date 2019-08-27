@@ -57,8 +57,15 @@ function _inherits(subClass, superClass) { if (typeof superClass !== "function" 
 
 function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
 
+var IS_LIGHT_THEME = _config.default.theme.type === 'light';
 var RGX_CELL_PLACEHOLDER = /\$\{(time)(?:-(to|from))?\}|\$\{(col|var):((?:[^\}:\\]*|\\.)+)(?::(?:(raw)|(param)(?::((?:[^\}:\\]*|\\.)+))?))?\}/g;
 var RGX_OLD_VAR_WORKAROUND = /([\?&])var-(\$\{var:(?:[^\}:\\]*|\\.)+:param\})/g;
+var COUNT_TYPE_MAP = {
+  sum: _lodash.default.sum,
+  avg: _lodash.default.mean,
+  min: _lodash.default.min,
+  max: _lodash.default.max
+};
 var PANEL_DEFAULTS = {
   chartType: null
 };
@@ -110,7 +117,6 @@ var BAR_DEFAULTS = {
     }
   }
 };
-var BAR_OPTIONS = Object.keys(_YourJS.default.flattenKeys(BAR_DEFAULTS, true));
 var FUNNEL_DEFAULTS = {
   hAlign: 'center',
   sortOrder: 'desc',
@@ -135,7 +141,6 @@ var FUNNEL_DEFAULTS = {
     isReverse: false
   }
 };
-var FUNNEL_OPTIONS = Object.keys(_YourJS.default.flattenKeys(FUNNEL_DEFAULTS, true));
 var PIE_DEFAULTS = {
   pieType: 'pie',
   isSemiCircle: false,
@@ -166,11 +171,10 @@ var PIE_DEFAULTS = {
     isReverse: false
   }
 };
-var PIE_OPTIONS = Object.keys(_YourJS.default.flattenKeys(PIE_DEFAULTS, true));
 var OPTIONS_BY_TYPE = {
-  bar: BAR_OPTIONS,
-  pie: PIE_OPTIONS,
-  funnel: FUNNEL_OPTIONS
+  bar: Object.keys(_YourJS.default.flattenKeys(BAR_DEFAULTS, true)),
+  pie: Object.keys(_YourJS.default.flattenKeys(PIE_DEFAULTS, true)),
+  funnel: Object.keys(_YourJS.default.flattenKeys(FUNNEL_DEFAULTS, true))
 };
 
 var ChartJsPanelCtrl =
@@ -643,60 +647,80 @@ function (_MetricsPanelCtrl) {
       }
     }
   }, {
-    key: "drawPieChart",
-    value: function drawPieChart(canvas) {
+    key: "getChartOptions",
+    value: function getChartOptions(chartType) {
       var ctrl = this;
       var data = ctrl.data;
       var rows = data.rows,
           colIndexesByText = data.colIndexesByText;
       var fullPanel = ctrl.panel;
-      var panel = fullPanel.pie;
+      var panel = fullPanel[chartType];
+      var colorSource = panel.colorSource,
+          seriesColors = panel.seriesColors,
+          colorColumnName = panel.colorColumnName,
+          colorBy = panel.colorBy,
+          sortOrder = panel.sortOrder;
+      var countType = panel.countType || 'sum';
       var categoryColIndex = ctrl.getColIndex('category', panel);
       var seriesColIndex = panel.pieType === 'polar' ? -1 : ctrl.getColIndex('series', panel, true);
       var measureColIndex = ctrl.getColIndex('measure', panel);
       var labelColIndex = ctrl.getColIndex('label', panel, true);
-      var colorColIndex = ctrl.getColIndex('color', panel, true);
+      var colorColIndex = colorBy === 'column' ? ctrl.getColIndex('color', panel, true) : -1;
+      var stackColIndex = ctrl.getColIndex('stack', panel, true);
       var ignoreSeries = seriesColIndex < 0;
 
       var categories = _lodash.default.uniq(rows.map(function (row) {
         return row[categoryColIndex];
-      })).reverse();
+      }));
 
       var series = _lodash.default.uniq(rows.map(function (row) {
         return row[seriesColIndex];
-      })).reverse();
+      }));
+
+      if (chartType === 'pie') {
+        categories.reverse();
+        series.reverse();
+      }
 
       var categoryCount = categories.length;
       var seriesCount = series.length;
       var measureCount = categoryCount * seriesCount;
 
       var _rows$reduce = rows.reduce(function (carry, row, rowIndex) {
-        var category = row[categoryColIndex];
-        var categoryIndex = categories.indexOf(category);
-        var seriesName = row[seriesColIndex];
-        var seriesIndex = series.indexOf(seriesName);
-        var index = categoryIndex + seriesIndex * categoryCount;
-        carry.measures[index] = (carry.measures[index] || 0) + row[measureColIndex];
+        var seriesIndex = series.indexOf(row[seriesColIndex]);
+        var index = categories.indexOf(row[categoryColIndex]) + seriesIndex * categoryCount;
+        (carry.measures[index] = carry.measures[index] || []).push(row[measureColIndex]);
+        (carry.rowsByMeasure[index] = carry.rowsByMeasure[index] || []).push(row);
         carry.labels[index] = carry.labels[index] || row[labelColIndex];
         carry.colors[index] = carry.colors[index] || row[colorColIndex];
+        carry.seriesStacks[seriesIndex] = carry.seriesStacks[seriesIndex] || row[stackColIndex];
         return carry;
       }, {
         measures: [],
         labels: [],
-        colors: []
+        colors: [],
+        rowsByMeasure: [],
+        seriesStacks: []
       }),
           measures = _rows$reduce.measures,
           labels = _rows$reduce.labels,
-          colors = _rows$reduce.colors;
+          colors = _rows$reduce.colors,
+          rowsByMeasure = _rows$reduce.rowsByMeasure,
+          seriesStacks = _rows$reduce.seriesStacks;
+
+      var countMeasures = COUNT_TYPE_MAP[countType];
+
+      if (!countMeasures) {
+        throw new Error("Unknown count type:\t".concat(countType));
+      }
+
+      for (var i = measureCount; i--;) {
+        measures[i] = countMeasures(measures[i] || [0]);
+        rowsByMeasure[i] = rowsByMeasure[i] || [];
+      }
 
       var baseColors;
-      var colorSource = panel.colorSource,
-          seriesColors = panel.seriesColors,
-          colorColumnName = panel.colorColumnName,
-          colorBy = panel.colorBy,
-          sortOrder = panel.sortOrder;
       var seriesColorCount = seriesColors.length;
-      var isLightTheme = _config.default.theme.type === 'light';
 
       if (colorSource === 'column') {
         if (!_lodash.default.has(colIndexesByText, colorColumnName)) {
@@ -734,57 +758,101 @@ function (_MetricsPanelCtrl) {
             });
           });
         }
-      }
-
-      function testChartEvent(e, callback) {
-        var elem = this.getElementAtEvent(e)[0];
-        var isOpen;
-
-        if (elem) {
-          var category = categories[elem._index];
-          isOpen = panel.drilldownLinks.some(function (drilldownLink, drilldownLinkIndex) {
-            // Check this link to see if it matches...
-            var url = drilldownLink.url,
-                rgxCategory = drilldownLink.category;
-
-            if (url) {
-              rgxCategory = (0, _helperFunctions.parseRegExp)(rgxCategory);
-
-              if (rgxCategory.test(category)) {
-                callback(drilldownLinkIndex, rows.filter(function (row) {
-                  return row[categoryColIndex] === category;
-                }));
-                return true;
-              }
-            }
-          });
-        }
-
-        if (!isOpen) {
-          callback(-1, []);
-        }
       } // Derive the background and border colors from the base colors.
 
 
       var bgColors = baseColors.map(function (color) {
-        return color.a(panel.dataBgColorAlpha).rgba();
+        return (0, _CWestColor.Color)(color).a(panel.dataBgColorAlpha).rgba();
       });
       var borderColors = baseColors.map(function (color) {
-        return color.l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba();
+        return (0, _CWestColor.Color)(color).l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba();
       });
+      return {
+        ctrl: ctrl,
+        data: data,
+        rows: rows,
+        colIndexesByText: colIndexesByText,
+        fullPanel: fullPanel,
+        panel: panel,
+        countType: countType,
+        categoryColIndex: categoryColIndex,
+        seriesColIndex: seriesColIndex,
+        measureColIndex: measureColIndex,
+        labelColIndex: labelColIndex,
+        colorColIndex: colorColIndex,
+        stackColIndex: stackColIndex,
+        seriesStacks: seriesStacks,
+        ignoreSeries: ignoreSeries,
+        categories: categories,
+        series: series,
+        categoryCount: categoryCount,
+        seriesCount: seriesCount,
+        measures: measures,
+        measureCount: measureCount,
+        labels: labels,
+        rowsByMeasure: rowsByMeasure,
+        baseColors: baseColors,
+        bgColors: bgColors,
+        borderColors: borderColors,
+        sortOrder: sortOrder,
+        testChartEvent: function testChartEvent(e, callback) {
+          var elem = this.getElementAtEvent(e)[0];
+          var isOpen;
+
+          if (elem) {
+            var seriesIndex = elem._datasetIndex,
+                categoryIndex = elem._index;
+            var category = categories[categoryIndex];
+            var seriesName = series[seriesIndex];
+            isOpen = panel.drilldownLinks.some(function (drilldownLink, drilldownLinkIndex) {
+              // Check this link to see if it matches...
+              var url = drilldownLink.url,
+                  rgxCategory = drilldownLink.category,
+                  rgxSeries = drilldownLink.series;
+
+              if (url) {
+                if ((0, _helperFunctions.parseRegExp)(rgxCategory).test(category) && (ignoreSeries || (0, _helperFunctions.parseRegExp)(rgxSeries).test(seriesName))) {
+                  callback(drilldownLinkIndex, rowsByMeasure[categoryIndex + seriesIndex * categoryCount]);
+                  return true;
+                }
+              }
+            });
+          }
+
+          if (!isOpen) {
+            callback(-1, []);
+          }
+        }
+      };
+    }
+  }, {
+    key: "drawPieChart",
+    value: function drawPieChart(canvas) {
+      var _this$getChartOptions = this.getChartOptions('pie'),
+          ctrl = _this$getChartOptions.ctrl,
+          panel = _this$getChartOptions.panel,
+          labelColIndex = _this$getChartOptions.labelColIndex,
+          colorColIndex = _this$getChartOptions.colorColIndex,
+          categories = _this$getChartOptions.categories,
+          series = _this$getChartOptions.series,
+          categoryCount = _this$getChartOptions.categoryCount,
+          measures = _this$getChartOptions.measures,
+          labels = _this$getChartOptions.labels,
+          bgColors = _this$getChartOptions.bgColors,
+          borderColors = _this$getChartOptions.borderColors,
+          testChartEvent = _this$getChartOptions.testChartEvent;
+
       var datasets = series.map(function (seriesName, seriesIndex) {
+        var fnFilter = function fnFilter(measure, measureIndex) {
+          return ~~(measureIndex / categoryCount) === seriesIndex;
+        };
+
         return {
           label: categories,
-          data: measures.filter(function (measure, measureIndex) {
-            return ~~(measureIndex / categoryCount) === seriesIndex;
-          }),
+          data: measures.filter(fnFilter),
           borderWidth: panel.borderWidth,
-          borderColor: borderColors.filter(function (measure, measureIndex) {
-            return ~~(measureIndex / categoryCount) === seriesIndex;
-          }),
-          backgroundColor: bgColors.filter(function (measure, measureIndex) {
-            return ~~(measureIndex / categoryCount) === seriesIndex;
-          }),
+          borderColor: borderColors.filter(fnFilter),
+          backgroundColor: bgColors.filter(fnFilter),
           datalabels: {
             anchor: 'center',
             display: 'auto',
@@ -846,7 +914,7 @@ function (_MetricsPanelCtrl) {
             fullWidth: panel.legend.isFullWidth,
             reverse: panel.legend.isReverse,
             labels: {
-              fontColor: isLightTheme ? '#333' : '#CCC'
+              fontColor: IS_LIGHT_THEME ? '#333' : '#CCC'
             }
           },
           animation: {
@@ -886,45 +954,37 @@ function (_MetricsPanelCtrl) {
   }, {
     key: "drawBarChart",
     value: function drawBarChart(canvas) {
-      var ctrl = this;
-      var data = ctrl.data;
-      var rows = data.rows,
-          rowsByColName = data.rowsByColName,
-          colIndexesByText = data.colIndexesByText;
-      var fullPanel = ctrl.panel;
-      var panel = fullPanel.bar;
-      var categoryColIndex = ctrl.getColIndex('category', panel);
-      var seriesColIndex = ctrl.getColIndex('series', panel, true);
-      var stackColIndex = ctrl.getColIndex('stack', panel, true);
-      var measureColIndex = ctrl.getColIndex('measure', panel);
-      var ignoreSeries = seriesColIndex < 0;
+      // TODO: Remove unused variables
+      var _this$getChartOptions2 = this.getChartOptions('bar'),
+          ctrl = _this$getChartOptions2.ctrl,
+          data = _this$getChartOptions2.data,
+          rows = _this$getChartOptions2.rows,
+          colIndexesByText = _this$getChartOptions2.colIndexesByText,
+          fullPanel = _this$getChartOptions2.fullPanel,
+          panel = _this$getChartOptions2.panel,
+          countType = _this$getChartOptions2.countType,
+          categoryColIndex = _this$getChartOptions2.categoryColIndex,
+          seriesColIndex = _this$getChartOptions2.seriesColIndex,
+          measureColIndex = _this$getChartOptions2.measureColIndex,
+          labelColIndex = _this$getChartOptions2.labelColIndex,
+          colorColIndex = _this$getChartOptions2.colorColIndex,
+          stackColIndex = _this$getChartOptions2.stackColIndex,
+          seriesStacks = _this$getChartOptions2.seriesStacks,
+          ignoreSeries = _this$getChartOptions2.ignoreSeries,
+          categories = _this$getChartOptions2.categories,
+          series = _this$getChartOptions2.series,
+          categoryCount = _this$getChartOptions2.categoryCount,
+          seriesCount = _this$getChartOptions2.seriesCount,
+          measures = _this$getChartOptions2.measures,
+          measureCount = _this$getChartOptions2.measureCount,
+          labels = _this$getChartOptions2.labels,
+          rowsByMeasure = _this$getChartOptions2.rowsByMeasure,
+          baseColors = _this$getChartOptions2.baseColors,
+          bgColors = _this$getChartOptions2.bgColors,
+          borderColors = _this$getChartOptions2.borderColors,
+          sortOrder = _this$getChartOptions2.sortOrder,
+          testChartEvent = _this$getChartOptions2.testChartEvent; // If legacy bar chart colors exist convert them to new color setup
 
-      var categories = _lodash.default.uniq(rows.map(function (row) {
-        return row[categoryColIndex];
-      }));
-
-      var _rows$reduce2 = rows.reduce(function (carry, row) {
-        var seriesName = row[seriesColIndex];
-
-        if (!carry.series.includes(seriesName)) {
-          carry.series.push(seriesName);
-          carry.seriesStacks.push(row[stackColIndex]);
-        }
-
-        return carry;
-      }, {
-        series: [],
-        seriesStacks: []
-      }),
-          series = _rows$reduce2.series,
-          seriesStacks = _rows$reduce2.seriesStacks;
-
-      series = series.map(function (name) {
-        return name === undefined ? 'Series' : name;
-      });
-      seriesStacks = seriesStacks.map(function (name) {
-        return name === undefined ? 'Stack' : name;
-      }); // If legacy bar chart colors exist convert them to new color setup
 
       if (_lodash.default.has(panel, ['seriesColors', 0, 'text'])) {
         panel.seriesColors = panel.seriesColors.map(function (color) {
@@ -933,111 +993,25 @@ function (_MetricsPanelCtrl) {
         panel.colorSource = 'custom';
       }
 
-      var colorSource = panel.colorSource,
-          seriesColors = panel.seriesColors,
-          colorColumnName = panel.colorColumnName,
-          colorBy = panel.colorBy;
-      var colorColIndex;
+      var datasets = series.map(function (seriesName, seriesIndex) {
+        var fnFilter = function fnFilter(measure, measureIndex) {
+          return ~~(measureIndex / categoryCount) === seriesIndex;
+        };
 
-      if (colorSource === 'column') {
-        colorColIndex = ctrl.getColIndex('color', panel);
-      }
-
-      var rowCount = rows.length;
-      var colorCount = colorBy === 'category' ? categories.length : colorBy === 'both' ? categories.length * series.length : series.length;
-      var baseColors = series.map(function (seriesName, seriesIndex) {
-        return categories.map(function (catName, catIndex) {
-          if (colorSource === 'column' && colorColIndex >= 0) {
-            // column
-            for (var row, rowIndex = 0; rowIndex < rowCount; rowIndex++) {
-              row = rows[rowIndex];
-
-              if ((seriesColIndex < 0 || row[seriesColIndex] === seriesName) && row[categoryColIndex] === catName) {
-                return (0, _CWestColor.Color)(row[colorColIndex]);
-              }
-            }
-          } else {
-            var index = colorBy === 'category' ? catIndex : colorBy === 'both' ? catIndex + categories.length * seriesIndex : seriesIndex;
-
-            if (colorSource === 'custom') {
-              // user-defined
-              return (0, _CWestColor.Color)(seriesColors[index % seriesColors.length]);
-            } else {
-              // rainbow (default)
-              return _CWestColor.Color.hsl(~~(360 * index / colorCount), 1, 0.5);
-            }
-          }
-        });
+        return {
+          label: seriesName,
+          data: measures.filter(fnFilter),
+          borderWidth: panel.borderWidth,
+          borderColor: borderColors.filter(fnFilter),
+          backgroundColor: bgColors.filter(fnFilter),
+          stack: panel.isStacked ? seriesStacks[seriesIndex] : seriesIndex
+        };
       });
-
-      function testChartEvent(e, callback) {
-        var target = this.getElementAtEvent(e)[0];
-        var model = target && target._model;
-        var isOpen;
-
-        if (model) {
-          var category = model.label;
-          var seriesName = model.datasetLabel;
-          isOpen = panel.drilldownLinks.some(function (drilldownLink, drilldownLinkIndex) {
-            // Check this link to see if it matches...
-            var url = drilldownLink.url,
-                rgxCategory = drilldownLink.category,
-                rgxSeries = drilldownLink.series;
-
-            if (url) {
-              rgxCategory = (0, _helperFunctions.parseRegExp)(rgxCategory);
-              rgxSeries = !ignoreSeries && (0, _helperFunctions.parseRegExp)(rgxSeries);
-
-              if (rgxCategory.test(category) && (ignoreSeries || rgxSeries.test(seriesName))) {
-                callback(drilldownLinkIndex, rows.filter(function (row) {
-                  return row[categoryColIndex] === category && (ignoreSeries || row[seriesColIndex] === seriesName);
-                }));
-                return true;
-              }
-            }
-          });
-        }
-
-        if (!isOpen) {
-          callback(-1, []);
-        }
-      }
-
-      var isLightTheme = _config.default.theme.type === 'light';
-      var measures = {};
       var chartConfig = {
         type: panel.orientation === 'horizontal' ? 'horizontalBar' : 'bar',
         data: {
-          labels: categories,
-          datasets: series.map(function (seriesName, seriesNameIndex) {
-            return {
-              label: seriesName,
-              backgroundColor: baseColors[seriesNameIndex].map(function (color) {
-                return color.a(panel.dataBgColorAlpha).rgba();
-              }),
-              borderColor: baseColors[seriesNameIndex].map(function (color) {
-                return color.l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba();
-              }),
-              borderWidth: panel.borderWidth,
-              stack: panel.isStacked ? seriesStacks[seriesNameIndex] : seriesNameIndex,
-              filteredRows: categories.map(function (category) {
-                return rows.reduce(function (carry, row, rowIndex) {
-                  if (row[categoryColIndex] === category && (seriesColIndex < 0 || row[seriesColIndex] === seriesName)) {
-                    carry.push(rowsByColName[rowIndex]);
-                  }
-
-                  return carry;
-                }, []);
-              }),
-              data: categories.map(function (category) {
-                var sum = rows.reduce(function (sum, row) {
-                  var isMatch = row[categoryColIndex] === category && (seriesColIndex < 0 || row[seriesColIndex] === seriesName);
-                  return sum + (isMatch ? +row[measureColIndex] || 0 : 0);
-                }, 0);
-                return (measures[category] = measures[category] || {})[seriesName] = sum;
-              })
-            };
-          })
+          datasets: datasets,
+          labels: categories
         },
         //plugins: [ChartDataLabels],
         options: {
@@ -1050,35 +1024,38 @@ function (_MetricsPanelCtrl) {
                     tooltipItem = _ref5[0];
 
                 if (!ignoreSeries) {
-                  var datasets = data.datasets,
-                      labels = data.labels;
-                  var dataset = datasets[tooltipItem.datasetIndex];
-                  var catName = labels[tooltipItem.index];
-                  var seriesName = dataset.label;
-                  var value = tooltipItem[panel.orientation === 'horizontal' ? 'xLabel' : 'yLabel'];
-                  var filteredRows = dataset.filteredRows[tooltipItem.index];
+                  var _datasets = data.datasets,
+                      _labels = data.labels;
+                  var seriesIndex = tooltipItem.datasetIndex,
+                      categoryIndex = tooltipItem.index;
+                  var category = categories[categoryIndex];
+                  var seriesName = series[seriesIndex];
+                  var measureIndex = categoryIndex + seriesIndex * categoryCount;
+                  var measure = measures[measureIndex];
+                  var _rows = rowsByMeasure[measureIndex];
                   var _panel$tooltip = panel.tooltip,
                       isCustom = _panel$tooltip.isCustom,
                       titleFormat = _panel$tooltip.titleFormat;
-                  return isCustom ? titleFormat ? ctrl.formatTooltipText(titleFormat, filteredRows, seriesName, catName, value) : null : tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel'];
+                  return isCustom ? titleFormat ? ctrl.formatTooltipText(titleFormat, _rows, seriesName, category, measure) : null : seriesName;
                 }
               },
               label: function label(tooltipItem, data) {
                 var datasets = data.datasets,
                     labels = data.labels;
-                var dataset = datasets[tooltipItem.datasetIndex];
-                var catName = labels[tooltipItem.index];
-                var seriesName = dataset.label;
+                var seriesIndex = tooltipItem.datasetIndex,
+                    categoryIndex = tooltipItem.index;
+                var category = categories[categoryIndex];
+                var seriesName = series[seriesIndex];
+                var measureIndex = categoryIndex + seriesIndex * categoryCount;
+                var measure = measures[measureIndex];
+                var rows = rowsByMeasure[measureIndex];
                 var numberFormat = panel.numberFormat,
                     numberFormatDecimals = panel.numberFormatDecimals;
                 var _panel$tooltip2 = panel.tooltip,
                     isCustom = _panel$tooltip2.isCustom,
                     labelFormat = _panel$tooltip2.labelFormat;
-                var label = ignoreSeries ? tooltipItem[panel.orientation === 'horizontal' ? 'yLabel' : 'xLabel'] : seriesName;
-                var value = tooltipItem[panel.orientation === 'horizontal' ? 'xLabel' : 'yLabel'];
-                var strValue = !['none', null, void 0].includes(numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(numberFormat)(value, numberFormatDecimals, null) : value;
-                var filteredRows = dataset.filteredRows[tooltipItem.index];
-                return isCustom && labelFormat ? ctrl.formatTooltipText(labelFormat, filteredRows, seriesName, catName, value) : label + ': ' + strValue;
+                var strMeasure = !['none', null, void 0].includes(numberFormat) && 'number' === typeof measure ? (0, _ui.getValueFormat)(numberFormat)(measure, numberFormatDecimals, null) : measure;
+                return isCustom && labelFormat ? ctrl.formatTooltipText(labelFormat, rows, seriesName, category, measure) : category + ': ' + strMeasure;
               }
             }
           },
@@ -1088,7 +1065,7 @@ function (_MetricsPanelCtrl) {
             fullWidth: panel.legend.isFullWidth,
             reverse: panel.legend.isReverse,
             labels: {
-              fontColor: isLightTheme ? '#333' : '#CCC'
+              fontColor: IS_LIGHT_THEME ? '#333' : '#CCC'
             }
           },
           scales: {
@@ -1097,7 +1074,7 @@ function (_MetricsPanelCtrl) {
                 autoSkip: panel.scales.xAxes.ticks.autoSkip,
                 minRotation: panel.scales.xAxes.ticks.minRotation,
                 maxRotation: panel.scales.xAxes.ticks.maxRotation,
-                fontColor: isLightTheme ? '#333' : '#CCC',
+                fontColor: IS_LIGHT_THEME ? '#333' : '#CCC',
                 userCallback: function userCallback(value, index, values) {
                   var numberFormat = panel.numberFormat,
                       numberFormatDecimals = panel.numberFormatDecimals;
@@ -1107,7 +1084,7 @@ function (_MetricsPanelCtrl) {
               stacked: true,
               gridLines: {
                 display: !!panel.scales.xAxes.gridLineOpacity,
-                color: isLightTheme ? "rgba(0,0,0,".concat(+panel.scales.xAxes.gridLineOpacity, ")") : "rgba(255,255,255,".concat(+panel.scales.xAxes.gridLineOpacity, ")")
+                color: IS_LIGHT_THEME ? "rgba(0,0,0,".concat(+panel.scales.xAxes.gridLineOpacity, ")") : "rgba(255,255,255,".concat(+panel.scales.xAxes.gridLineOpacity, ")")
               }
             }],
             yAxes: [{
@@ -1115,7 +1092,7 @@ function (_MetricsPanelCtrl) {
                 autoSkip: panel.scales.yAxes.ticks.autoSkip,
                 minRotation: panel.scales.yAxes.ticks.minRotation,
                 maxRotation: panel.scales.yAxes.ticks.maxRotation,
-                fontColor: isLightTheme ? '#333' : '#CCC',
+                fontColor: IS_LIGHT_THEME ? '#333' : '#CCC',
                 userCallback: function userCallback(value, index, values) {
                   var numberFormat = panel.numberFormat,
                       numberFormatDecimals = panel.numberFormatDecimals;
@@ -1125,7 +1102,7 @@ function (_MetricsPanelCtrl) {
               stacked: true,
               gridLines: {
                 display: !!panel.scales.yAxes.gridLineOpacity,
-                color: isLightTheme ? "rgba(0,0,0,".concat(+panel.scales.yAxes.gridLineOpacity, ")") : "rgba(255,255,255,".concat(+panel.scales.yAxes.gridLineOpacity, ")")
+                color: IS_LIGHT_THEME ? "rgba(0,0,0,".concat(+panel.scales.yAxes.gridLineOpacity, ")") : "rgba(255,255,255,".concat(+panel.scales.yAxes.gridLineOpacity, ")")
               }
             }]
           },
@@ -1173,7 +1150,6 @@ function (_MetricsPanelCtrl) {
           seriesColors = panel.seriesColors,
           colorColumnName = panel.colorColumnName,
           sortOrder = panel.sortOrder;
-      var isLightTheme = _config.default.theme.type === 'light';
 
       if (colorSource === 'column') {
         if (!_lodash.default.has(colIndexesByText, colorColumnName)) {
@@ -1311,7 +1287,7 @@ function (_MetricsPanelCtrl) {
             fullWidth: panel.legend.isFullWidth,
             reverse: panel.legend.isReverse,
             labels: {
-              fontColor: isLightTheme ? '#333' : '#CCC'
+              fontColor: IS_LIGHT_THEME ? '#333' : '#CCC'
             }
           },
           animation: {
