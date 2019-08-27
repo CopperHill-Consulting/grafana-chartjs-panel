@@ -31,14 +31,6 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 function _typeof(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
 
-function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest(); }
-
-function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance"); }
-
-function _iterableToArrayLimit(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"] != null) _i["return"](); } finally { if (_d) throw _e; } } return _arr; }
-
-function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
-
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -64,7 +56,16 @@ var COUNT_TYPE_MAP = {
   sum: _lodash.default.sum,
   avg: _lodash.default.mean,
   min: _lodash.default.min,
-  max: _lodash.default.max
+  max: _lodash.default.max,
+  count: function count(arr) {
+    return arr.length;
+  },
+  first: function first(arr) {
+    return arr[0];
+  },
+  last: function last(arr) {
+    return arr[arr.length - 1];
+  }
 };
 var PANEL_DEFAULTS = {
   chartType: null
@@ -85,12 +86,19 @@ var BAR_DEFAULTS = {
   dataBgColorAlpha: 0.75,
   dataBorderColorAlpha: 1,
   dataBorderBrightness: 0.5,
+  countType: 'sum',
   numberFormat: 'none',
   numberFormatDecimals: 0,
   tooltip: {
     isCustom: false,
     titleFormat: null,
     labelFormat: null
+  },
+  labels: {
+    isShowing: false,
+    format: '${measure}',
+    isBlackText: IS_LIGHT_THEME,
+    wrapAfter: 25
   },
   legend: {
     isShowing: true,
@@ -130,8 +138,20 @@ var FUNNEL_DEFAULTS = {
   dataBgColorAlpha: 0.75,
   dataBorderColorAlpha: 1,
   dataBorderBrightness: 0.5,
+  countType: 'sum',
   numberFormat: 'none',
   numberFormatDecimals: 0,
+  tooltip: {
+    isCustom: false,
+    titleFormat: null,
+    labelFormat: null
+  },
+  // labels: {
+  //   isShowing: false,
+  //   format: '${measure}',
+  //   isBlackText: IS_LIGHT_THEME,
+  //   wrapAfter: 25
+  // },
   gap: 1,
   startWidthPct: 0.5,
   legend: {
@@ -157,11 +177,18 @@ var PIE_DEFAULTS = {
   dataBgColorAlpha: 0.75,
   dataBorderBrightness: 0.5,
   dataBorderColorAlpha: 1,
+  countType: 'sum',
   numberFormat: 'none',
   numberFormatDecimals: 0,
+  tooltip: {
+    isCustom: false,
+    titleFormat: null,
+    labelFormat: null
+  },
   labels: {
-    isShowing: true,
-    isBlackText: false,
+    isShowing: false,
+    format: '${measure}',
+    isBlackText: IS_LIGHT_THEME,
     wrapAfter: 25
   },
   legend: {
@@ -267,6 +294,16 @@ function (_MetricsPanelCtrl) {
       value: 'custom',
       text: 'User-defined'
     }];
+    _this.CHART_LABEL_SOURCES = [{
+      value: null,
+      text: 'None'
+    }, {
+      value: 'column',
+      text: 'Column'
+    }, {
+      value: 'custom',
+      text: 'User-defined'
+    }];
     _this.CHART_TYPES = [{
       value: null,
       'text': '--- PICK ONE ---'
@@ -293,6 +330,15 @@ function (_MetricsPanelCtrl) {
       value: 'doughnut',
       text: 'Doughnut'
     }];
+    _this.COUNT_TYPES = [{
+      value: null,
+      text: '--- PICK ONE ---'
+    }].concat(Object.keys(COUNT_TYPE_MAP).map(function (t) {
+      return {
+        value: t,
+        text: _YourJS.default.titleCase(t)
+      };
+    }));
     _this.CHART_ORIENTATIONS = [{
       value: 'horizontal',
       text: "Horizontal (\u2194)"
@@ -392,40 +438,6 @@ function (_MetricsPanelCtrl) {
       }
     }
   }, {
-    key: "formatTooltipText",
-    value: function formatTooltipText(strFormat, rowsByColName, series, category, measure) {
-      return strFormat.replace(/(\\\$)|\$\{(?:(series)|(category)|measure|col:((?:[^\\\}:]+|\\.)+)(?::([\-\w]+))?)\}/g, function (match, isEscapedDollar, isSeries, isCategory, colName, colFnName) {
-        if (isEscapedDollar) {
-          match = '$';
-        } else if (colName) {
-          colName = colName.replace(/\\(.)/g, '$1');
-
-          if (_lodash.default.has(rowsByColName[0], colName)) {
-            match = rowsByColName.map(function (row) {
-              return row[colName];
-            });
-            match = colFnName === 'sum' ? match.reduce(function (a, b) {
-              return a + b;
-            }) : colFnName === 'avg' ? match.reduce(function (a, b) {
-              return a + b;
-            }) / match.length : colFnName === 'max' ? match.reduce(function (a, b) {
-              return a > b ? a : b;
-            }) : colFnName === 'min' ? match.reduce(function (a, b) {
-              return a < b ? a : b;
-            }) : colFnName === 'first' ? match[0] : colFnName === 'last' ? match[match.length - 1] : colFnName === 'count' ? match.length : colFnName === 'unique-count' ? new Set(match).size : colFnName === 'list' ? match.sort().reduce(function (a, b, c, d) {
-              return a + (c + 1 === d.length ? ' and ' : ', ') + b;
-            }) : colFnName === 'unique-list' ? Array.from(new Set(match)).sort().reduce(function (a, b, c, d) {
-              return a + (c + 1 === d.length ? ' and ' : ', ') + b;
-            }) : match.join(',');
-          }
-        } else {
-          match = isSeries ? series : isCategory ? category : measure;
-        }
-
-        return 'number' === typeof match ? +match.toFixed(5) : match;
-      });
-    }
-  }, {
     key: "addSeriesColor",
     value: function addSeriesColor(opt_index) {
       var panel = this.panel;
@@ -493,28 +505,28 @@ function (_MetricsPanelCtrl) {
     key: "onDataReceived",
     value: function onDataReceived(dataList) {
       if (dataList && dataList.length) {
-        var data = dataList[0];
-        var type = data.type,
-            columns = data.columns,
-            rows = data.rows;
+        var _dataList$ = dataList[0],
+            type = _dataList$.type,
+            columns = _dataList$.columns,
+            rows = _dataList$.rows;
         var columnTexts = columns.map(function (col) {
           return 'string' === typeof col ? col : col.text;
         });
-        var colIndexesByText = columnTexts.reduceRight(function (indexes, colText, index) {
-          return Object.assign(indexes, _defineProperty({}, colText, index));
-        }, {});
-        var rowsByColName = rows.map(function (cells, rowIndex) {
-          return cells.reduce(function (carry, cellValue, cellIndex) {
-            return Object.assign(carry, _defineProperty({}, columnTexts[cellIndex], cellValue));
-          }, {});
+        rows.map(function (row) {
+          return Object.assign(row, {
+            byColName: row.reduce(function (carry, cellValue, cellIndex) {
+              return Object.assign(carry, _defineProperty({}, columnTexts[cellIndex], cellValue));
+            }, {})
+          });
         });
         this.data = {
           type: type,
           columns: columns,
           rows: rows,
           columnTexts: columnTexts,
-          colIndexesByText: colIndexesByText,
-          rowsByColName: rowsByColName
+          colIndexesByText: columnTexts.reduceRight(function (indexes, colText, index) {
+            return Object.assign(indexes, _defineProperty({}, colText, index));
+          }, {})
         };
       } else {
         this.data = {};
@@ -659,13 +671,14 @@ function (_MetricsPanelCtrl) {
           seriesColors = panel.seriesColors,
           colorColumnName = panel.colorColumnName,
           colorBy = panel.colorBy,
-          sortOrder = panel.sortOrder;
-      var countType = panel.countType || 'sum';
+          sortOrder = panel.sortOrder,
+          countType = panel.countType,
+          labelOptions = panel.labels;
       var categoryColIndex = ctrl.getColIndex('category', panel);
       var seriesColIndex = panel.pieType === 'polar' ? -1 : ctrl.getColIndex('series', panel, true);
       var measureColIndex = ctrl.getColIndex('measure', panel);
       var labelColIndex = ctrl.getColIndex('label', panel, true);
-      var colorColIndex = colorBy === 'column' ? ctrl.getColIndex('color', panel, true) : -1;
+      var colorColIndex = colorSource === 'column' ? ctrl.getColIndex('color', panel, true) : -1;
       var stackColIndex = ctrl.getColIndex('stack', panel, true);
       var ignoreSeries = seriesColIndex < 0;
 
@@ -688,24 +701,24 @@ function (_MetricsPanelCtrl) {
 
       var _rows$reduce = rows.reduce(function (carry, row, rowIndex) {
         var seriesIndex = series.indexOf(row[seriesColIndex]);
-        var index = categories.indexOf(row[categoryColIndex]) + seriesIndex * categoryCount;
-        (carry.measures[index] = carry.measures[index] || []).push(row[measureColIndex]);
-        (carry.rowsByMeasure[index] = carry.rowsByMeasure[index] || []).push(row);
-        carry.labels[index] = carry.labels[index] || row[labelColIndex];
-        carry.colors[index] = carry.colors[index] || row[colorColIndex];
+        var measureIndex = categories.indexOf(row[categoryColIndex]) + seriesIndex * categoryCount;
+        (carry.measures[measureIndex] = carry.measures[measureIndex] || []).push(row[measureColIndex]);
+        (carry.rowGroups[measureIndex] = carry.rowGroups[measureIndex] || []).push(row);
+        carry.labels[measureIndex] = carry.labels[measureIndex] || row[labelColIndex];
+        carry.colors[measureIndex] = carry.colors[measureIndex] || row[colorColIndex];
         carry.seriesStacks[seriesIndex] = carry.seriesStacks[seriesIndex] || row[stackColIndex];
         return carry;
       }, {
         measures: [],
         labels: [],
         colors: [],
-        rowsByMeasure: [],
+        rowGroups: [],
         seriesStacks: []
       }),
           measures = _rows$reduce.measures,
           labels = _rows$reduce.labels,
           colors = _rows$reduce.colors,
-          rowsByMeasure = _rows$reduce.rowsByMeasure,
+          rowGroups = _rows$reduce.rowGroups,
           seriesStacks = _rows$reduce.seriesStacks;
 
       var countMeasures = COUNT_TYPE_MAP[countType];
@@ -716,7 +729,32 @@ function (_MetricsPanelCtrl) {
 
       for (var i = measureCount; i--;) {
         measures[i] = countMeasures(measures[i] || [0]);
-        rowsByMeasure[i] = rowsByMeasure[i] || [];
+        rowGroups[i] = rowGroups[i] || [];
+      }
+
+      if (chartType === 'funnel') {
+        var sortMap = measures.map(function (v, i) {
+          return {
+            v: v,
+            i: i
+          };
+        }).sort(sortOrder === 'desc' ? function (a, b) {
+          return b.v - a.v;
+        } : function (a, b) {
+          return a.v - b.v;
+        }).map(function (_ref) {
+          var i = _ref.i;
+          return i;
+        });
+
+        var remap = function remap(v, i, a) {
+          return a[sortMap[i]];
+        };
+
+        measures = measures.map(remap);
+        labels = labels.map(remap);
+        colors = colors.map(remap);
+        rowGroups = rowGroups.map(remap);
       }
 
       var baseColors;
@@ -767,6 +805,113 @@ function (_MetricsPanelCtrl) {
       var borderColors = baseColors.map(function (color) {
         return (0, _CWestColor.Color)(color).l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba();
       });
+
+      function formatLabelText(strFormat, rows, series, category, measure) {
+        return strFormat.replace(/(\\\$)|\$\{(?:(series)|(category)|measure|col:((?:[^\\\}:]+|\\.)+)(?::([\-\w]+))?)\}/g, function (match, isEscapedDollar, isSeries, isCategory, colName, colFnName) {
+          if (isEscapedDollar) {
+            match = '$';
+          } else if (colName) {
+            colName = colName.replace(/\\(.)/g, '$1');
+
+            if (_lodash.default.has(rows[0].byColName, colName)) {
+              match = rows.map(function (row) {
+                return row.byColName[colName];
+              });
+              match = colFnName === 'sum' ? match.reduce(function (a, b) {
+                return a + b;
+              }) : colFnName === 'avg' ? match.reduce(function (a, b) {
+                return a + b;
+              }) / match.length : colFnName === 'max' ? match.reduce(function (a, b) {
+                return a > b ? a : b;
+              }) : colFnName === 'min' ? match.reduce(function (a, b) {
+                return a < b ? a : b;
+              }) : colFnName === 'first' ? match[0] : colFnName === 'last' ? match[match.length - 1] : colFnName === 'count' ? match.length : colFnName === 'unique-count' ? new Set(match).size : colFnName === 'list' ? match.sort().reduce(function (a, b, c, d) {
+                return a + (c + 1 === d.length ? ' and ' : ', ') + b;
+              }) : colFnName === 'unique-list' ? Array.from(new Set(match)).sort().reduce(function (a, b, c, d) {
+                return a + (c + 1 === d.length ? ' and ' : ', ') + b;
+              }) : match.join(',');
+            }
+          } else {
+            match = isSeries ? series : isCategory ? category : measure;
+          }
+
+          return 'number' === typeof match ? +match.toFixed(5) : match;
+        });
+      }
+
+      function getLabelFormatter(defaultFormat) {
+        var labelType = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'tooltip';
+        labelType = labelType.toLowerCase();
+        var isForChart = labelType === 'chart';
+        var isForTooltip = labelType === 'tooltip';
+
+        if (!(isForChart || isForTooltip)) {
+          throw new Error("Unknown label format:\t".concat(labelType));
+        }
+
+        return function () {
+          if (isForTooltip) {
+            var tooltipItems = arguments[0];
+            var isForTitle = Array.isArray(tooltipItems);
+
+            var _ref2 = isForTitle ? tooltipItems[0] : tooltipItems,
+                seriesIndex = _ref2.datasetIndex,
+                categoryIndex = _ref2.index;
+          } else {
+            var labelItem = arguments[1];
+            var isForTitle = false;
+            var seriesIndex = labelItem.datasetIndex,
+                categoryIndex = labelItem.dataIndex;
+          }
+
+          var category = categories[categoryIndex];
+          var seriesName = series[seriesIndex];
+          var measureIndex = categoryIndex + seriesIndex * categoryCount;
+          var measure = measures[measureIndex];
+          var rows = rowGroups[measureIndex];
+          var numberFormat = panel.numberFormat,
+              numberFormatDecimals = panel.numberFormatDecimals;
+          var _panel$tooltip = panel.tooltip,
+              isCustom = _panel$tooltip.isCustom,
+              titleFormat = _panel$tooltip.titleFormat,
+              labelFormat = _panel$tooltip.labelFormat;
+          var strMeasure = !['none', null, void 0].includes(numberFormat) && 'number' === typeof measure ? (0, _ui.getValueFormat)(numberFormat)(measure, numberFormatDecimals, null) : measure;
+          var strFormat = (isForTooltip ? isCustom && (isForTitle ? titleFormat : labelFormat) : labelOptions.format) || defaultFormat;
+          var strResult = strFormat.replace(/(\\\$)|\$\{(?:(series)|(category)|measure|col:((?:[^\\\}:]+|\\.)+)(?::([\-\w]+))?)\}/g, function (match, isEscapedDollar, isSeries, isCategory, colName, colFnName) {
+            if (isEscapedDollar) {
+              match = '$';
+            } else if (colName) {
+              colName = colName.replace(/\\(.)/g, '$1');
+
+              if (_lodash.default.has(rows[0].byColName, colName)) {
+                match = rows.map(function (row) {
+                  return row.byColName[colName];
+                });
+                match = colFnName === 'sum' ? match.reduce(function (a, b) {
+                  return a + b;
+                }) : colFnName === 'avg' ? match.reduce(function (a, b) {
+                  return a + b;
+                }) / match.length : colFnName === 'max' ? match.reduce(function (a, b) {
+                  return a > b ? a : b;
+                }) : colFnName === 'min' ? match.reduce(function (a, b) {
+                  return a < b ? a : b;
+                }) : colFnName === 'first' ? match[0] : colFnName === 'last' ? match[match.length - 1] : colFnName === 'count' ? match.length : colFnName === 'unique-count' ? new Set(match).size : colFnName === 'list' ? match.sort().reduce(function (a, b, c, d) {
+                  return a + (c + 1 === d.length ? ' and ' : ', ') + b;
+                }) : colFnName === 'unique-list' ? Array.from(new Set(match)).sort().reduce(function (a, b, c, d) {
+                  return a + (c + 1 === d.length ? ' and ' : ', ') + b;
+                }) : colFnName === 'titlecase' ? _YourJS.default.titleCase(match[0] + '') : colFnName === 'uppercase' ? (match[0] + '').toUpperCase() : colFnName === 'lowercase' ? (match[0] + '').toLowerCase() : match.join(',');
+              }
+            } else {
+              // coerces to strings while making sure that undefined and null become empty strings
+              match = [] + [isSeries ? seriesName : isCategory ? category : strMeasure];
+            }
+
+            return 'number' === typeof match ? +match.toFixed(5) : match;
+          }) || '';
+          return isForChart ? (0, _helperFunctions.wrapText)(strResult, labelOptions.wrapAfter) : strResult;
+        };
+      }
+
       return {
         ctrl: ctrl,
         data: data,
@@ -790,11 +935,16 @@ function (_MetricsPanelCtrl) {
         measures: measures,
         measureCount: measureCount,
         labels: labels,
-        rowsByMeasure: rowsByMeasure,
+        rowGroups: rowGroups,
         baseColors: baseColors,
         bgColors: bgColors,
         borderColors: borderColors,
         sortOrder: sortOrder,
+        formatLabel: getLabelFormatter('${category}: ${measure}', 'chart'),
+        tooltipCallbacks: {
+          title: getLabelFormatter('${series}'),
+          label: getLabelFormatter('${category}: ${measure}')
+        },
         testChartEvent: function testChartEvent(e, callback) {
           var elem = this.getElementAtEvent(e)[0];
           var isOpen;
@@ -812,7 +962,7 @@ function (_MetricsPanelCtrl) {
 
               if (url) {
                 if ((0, _helperFunctions.parseRegExp)(rgxCategory).test(category) && (ignoreSeries || (0, _helperFunctions.parseRegExp)(rgxSeries).test(seriesName))) {
-                  callback(drilldownLinkIndex, rowsByMeasure[categoryIndex + seriesIndex * categoryCount]);
+                  callback(drilldownLinkIndex, rowGroups[categoryIndex + seriesIndex * categoryCount]);
                   return true;
                 }
               }
@@ -837,9 +987,10 @@ function (_MetricsPanelCtrl) {
           series = _this$getChartOptions.series,
           categoryCount = _this$getChartOptions.categoryCount,
           measures = _this$getChartOptions.measures,
-          labels = _this$getChartOptions.labels,
           bgColors = _this$getChartOptions.bgColors,
           borderColors = _this$getChartOptions.borderColors,
+          tooltipCallbacks = _this$getChartOptions.tooltipCallbacks,
+          formatLabel = _this$getChartOptions.formatLabel,
           testChartEvent = _this$getChartOptions.testChartEvent;
 
       var datasets = series.map(function (seriesName, seriesIndex) {
@@ -859,19 +1010,7 @@ function (_MetricsPanelCtrl) {
             backgroundColor: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
             color: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'black' : 'white').rgb(),
             borderRadius: 5,
-            formatter: function formatter(value, _ref) {
-              var dataIndex = _ref.dataIndex,
-                  datasetIndex = _ref.datasetIndex;
-              var result = labels[dataIndex + datasetIndex * categoryCount];
-
-              if (labelColIndex < 0) {
-                var numberFormat = panel.numberFormat,
-                    numberFormatDecimals = panel.numberFormatDecimals;
-                result = !['none', null, void 0].includes(numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(numberFormat)(value, numberFormatDecimals, null) : value;
-              }
-
-              return (0, _helperFunctions.wrapText)("".concat(result), panel.labels.wrapAfter);
-            },
+            formatter: formatLabel,
             textAlign: 'center'
           }
         };
@@ -880,9 +1019,7 @@ function (_MetricsPanelCtrl) {
         responsive: true,
         data: {
           datasets: datasets,
-          labels: 'string' === typeof datasets[0].label ? datasets[0].data.map(function (x, i) {
-            return "".concat(datasets[0].label, " #").concat(i + 1);
-          }) : datasets[0].label
+          labels: datasets[0].label
         },
         options: {
           circumference: (panel.isSemiCircle ? 1 : 2) * Math.PI,
@@ -891,22 +1028,7 @@ function (_MetricsPanelCtrl) {
             borderWidth: panel.borderWidth
           },
           tooltips: {
-            callbacks: {
-              title: function title(_ref2, data) {
-                var _ref3 = _slicedToArray(_ref2, 1),
-                    tooltipItem = _ref3[0];
-
-                return series[tooltipItem.datasetIndex];
-              },
-              label: function label(tooltipItem, data) {
-                var numberFormat = panel.numberFormat,
-                    numberFormatDecimals = panel.numberFormatDecimals;
-                var label = data.datasets[tooltipItem.datasetIndex].label[tooltipItem.index];
-                var value = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
-                value = !['none', null, void 0].includes(numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(numberFormat)(value, numberFormatDecimals, null) : value;
-                return label + ': ' + value;
-              }
-            }
+            callbacks: tooltipCallbacks
           },
           legend: {
             display: panel.legend.isShowing,
@@ -954,35 +1076,20 @@ function (_MetricsPanelCtrl) {
   }, {
     key: "drawBarChart",
     value: function drawBarChart(canvas) {
-      // TODO: Remove unused variables
       var _this$getChartOptions2 = this.getChartOptions('bar'),
           ctrl = _this$getChartOptions2.ctrl,
-          data = _this$getChartOptions2.data,
-          rows = _this$getChartOptions2.rows,
-          colIndexesByText = _this$getChartOptions2.colIndexesByText,
-          fullPanel = _this$getChartOptions2.fullPanel,
           panel = _this$getChartOptions2.panel,
-          countType = _this$getChartOptions2.countType,
-          categoryColIndex = _this$getChartOptions2.categoryColIndex,
-          seriesColIndex = _this$getChartOptions2.seriesColIndex,
-          measureColIndex = _this$getChartOptions2.measureColIndex,
-          labelColIndex = _this$getChartOptions2.labelColIndex,
-          colorColIndex = _this$getChartOptions2.colorColIndex,
-          stackColIndex = _this$getChartOptions2.stackColIndex,
           seriesStacks = _this$getChartOptions2.seriesStacks,
           ignoreSeries = _this$getChartOptions2.ignoreSeries,
           categories = _this$getChartOptions2.categories,
           series = _this$getChartOptions2.series,
           categoryCount = _this$getChartOptions2.categoryCount,
-          seriesCount = _this$getChartOptions2.seriesCount,
           measures = _this$getChartOptions2.measures,
-          measureCount = _this$getChartOptions2.measureCount,
-          labels = _this$getChartOptions2.labels,
-          rowsByMeasure = _this$getChartOptions2.rowsByMeasure,
-          baseColors = _this$getChartOptions2.baseColors,
+          rowGroups = _this$getChartOptions2.rowGroups,
           bgColors = _this$getChartOptions2.bgColors,
           borderColors = _this$getChartOptions2.borderColors,
-          sortOrder = _this$getChartOptions2.sortOrder,
+          tooltipCallbacks = _this$getChartOptions2.tooltipCallbacks,
+          formatLabel = _this$getChartOptions2.formatLabel,
           testChartEvent = _this$getChartOptions2.testChartEvent; // If legacy bar chart colors exist convert them to new color setup
 
 
@@ -1004,7 +1111,16 @@ function (_MetricsPanelCtrl) {
           borderWidth: panel.borderWidth,
           borderColor: borderColors.filter(fnFilter),
           backgroundColor: bgColors.filter(fnFilter),
-          stack: panel.isStacked ? seriesStacks[seriesIndex] : seriesIndex
+          stack: panel.isStacked ? seriesStacks[seriesIndex] : seriesIndex,
+          datalabels: {
+            anchor: 'center',
+            display: 'auto',
+            backgroundColor: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
+            color: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'black' : 'white').rgb(),
+            borderRadius: 5,
+            formatter: formatLabel,
+            textAlign: 'center'
+          }
         };
       });
       var chartConfig = {
@@ -1018,46 +1134,7 @@ function (_MetricsPanelCtrl) {
           responsive: true,
           tooltips: {
             mode: 'point',
-            callbacks: {
-              title: function title(_ref4, data) {
-                var _ref5 = _slicedToArray(_ref4, 1),
-                    tooltipItem = _ref5[0];
-
-                if (!ignoreSeries) {
-                  var _datasets = data.datasets,
-                      _labels = data.labels;
-                  var seriesIndex = tooltipItem.datasetIndex,
-                      categoryIndex = tooltipItem.index;
-                  var category = categories[categoryIndex];
-                  var seriesName = series[seriesIndex];
-                  var measureIndex = categoryIndex + seriesIndex * categoryCount;
-                  var measure = measures[measureIndex];
-                  var _rows = rowsByMeasure[measureIndex];
-                  var _panel$tooltip = panel.tooltip,
-                      isCustom = _panel$tooltip.isCustom,
-                      titleFormat = _panel$tooltip.titleFormat;
-                  return isCustom ? titleFormat ? ctrl.formatTooltipText(titleFormat, _rows, seriesName, category, measure) : null : seriesName;
-                }
-              },
-              label: function label(tooltipItem, data) {
-                var datasets = data.datasets,
-                    labels = data.labels;
-                var seriesIndex = tooltipItem.datasetIndex,
-                    categoryIndex = tooltipItem.index;
-                var category = categories[categoryIndex];
-                var seriesName = series[seriesIndex];
-                var measureIndex = categoryIndex + seriesIndex * categoryCount;
-                var measure = measures[measureIndex];
-                var rows = rowsByMeasure[measureIndex];
-                var numberFormat = panel.numberFormat,
-                    numberFormatDecimals = panel.numberFormatDecimals;
-                var _panel$tooltip2 = panel.tooltip,
-                    isCustom = _panel$tooltip2.isCustom,
-                    labelFormat = _panel$tooltip2.labelFormat;
-                var strMeasure = !['none', null, void 0].includes(numberFormat) && 'number' === typeof measure ? (0, _ui.getValueFormat)(numberFormat)(measure, numberFormatDecimals, null) : measure;
-                return isCustom && labelFormat ? ctrl.formatTooltipText(labelFormat, rows, seriesName, category, measure) : category + ': ' + strMeasure;
-              }
-            }
+            callbacks: tooltipCallbacks
           },
           legend: {
             display: panel.legend.isShowing,
@@ -1122,138 +1199,49 @@ function (_MetricsPanelCtrl) {
           }
         }
       };
+
+      if (panel.labels.isShowing) {
+        chartConfig.plugins = [ChartDataLabels];
+      }
+
       var myChart = new Chart(canvas.getContext('2d'), chartConfig);
     }
   }, {
     key: "drawFunnelChart",
     value: function drawFunnelChart(canvas) {
-      var ctrl = this;
-      var data = ctrl.data;
-      var rows = data.rows,
-          colIndexesByText = data.colIndexesByText;
-      var fullPanel = ctrl.panel;
-      var panel = fullPanel.funnel;
-      var categoryColIndex = ctrl.getColIndex('category', panel);
-      var measureColIndex = ctrl.getColIndex('measure', panel);
+      var _this$getChartOptions3 = this.getChartOptions('funnel'),
+          ctrl = _this$getChartOptions3.ctrl,
+          panel = _this$getChartOptions3.panel,
+          ignoreSeries = _this$getChartOptions3.ignoreSeries,
+          categories = _this$getChartOptions3.categories,
+          series = _this$getChartOptions3.series,
+          categoryCount = _this$getChartOptions3.categoryCount,
+          measures = _this$getChartOptions3.measures,
+          rowGroups = _this$getChartOptions3.rowGroups,
+          bgColors = _this$getChartOptions3.bgColors,
+          borderColors = _this$getChartOptions3.borderColors,
+          tooltipCallbacks = _this$getChartOptions3.tooltipCallbacks,
+          formatLabel = _this$getChartOptions3.formatLabel,
+          testChartEvent = _this$getChartOptions3.testChartEvent;
 
-      var categories = _lodash.default.uniq(rows.map(function (row) {
-        return row[categoryColIndex];
-      }));
-
-      var measures = rows.reduce(function (measures, row, rowIndex) {
-        var measureIndex = categories.indexOf(row[categoryColIndex]);
-        measures[measureIndex] = (measures[measureIndex] || 0) + row[measureColIndex];
-        return measures;
-      }, []);
-      var baseColors;
-      var colorSource = panel.colorSource,
-          seriesColors = panel.seriesColors,
-          colorColumnName = panel.colorColumnName,
-          sortOrder = panel.sortOrder;
-
-      if (colorSource === 'column') {
-        if (!_lodash.default.has(colIndexesByText, colorColumnName)) {
-          throw new Error('Invalid color column.');
-        }
-
-        baseColors = categories.map(function (category) {
-          return (0, _CWestColor.Color)(rows.find(function (row) {
-            return row[categoryColIndex] === category;
-          })[colIndexesByText[colorColumnName]]);
-        });
-      } else if (colorSource === 'custom') {
-        baseColors = categories.map(function (category, index, categories) {
-          return (0, _CWestColor.Color)(seriesColors[index % seriesColors.length]);
-        });
-      } else {
-        baseColors = categories.map(function (category, index, categories) {
-          return _CWestColor.Color.hsl(~~(360 * index / categories.length), 1, 0.5);
-        });
-      } // Sort the measures and then the categories accordingly.
-
-
-      var altBaseColors;
-      measures = measures.map(function (value, index) {
-        return {
-          index: index,
-          value: value
-        };
-      });
-      measures.sort(sortOrder === 'desc' ? function (a, b) {
-        return b.value - a.value;
-      } : function (a, b) {
-        return a.value - b.value;
-      });
-
-      var _measures$reduce = measures.reduce(function (carry, measure, index) {
-        var _carry = _slicedToArray(carry, 3),
-            altBaseColors = _carry[0],
-            newCategories = _carry[1],
-            newMeasures = _carry[2];
-
-        altBaseColors.push(baseColors[measure.index]);
-        newCategories.push(categories[measure.index]);
-        newMeasures.push(measure.value);
-        return carry;
-      }, [[], [], []]);
-
-      var _measures$reduce2 = _slicedToArray(_measures$reduce, 3);
-
-      altBaseColors = _measures$reduce2[0];
-      categories = _measures$reduce2[1];
-      measures = _measures$reduce2[2];
-
-      // If using a column as the source of the colors make sure to order them according to the categories.
-      if (colorSource === 'column') {
-        baseColors = altBaseColors;
-      }
-
-      function testChartEvent(e, callback) {
-        var elem = this.getElementAtEvent(e)[0];
-        var isOpen;
-
-        if (elem) {
-          var category = categories[elem._index];
-          isOpen = panel.drilldownLinks.some(function (drilldownLink, drilldownLinkIndex) {
-            // Check this link to see if it matches...
-            var url = drilldownLink.url,
-                rgxCategory = drilldownLink.category;
-
-            if (url) {
-              rgxCategory = (0, _helperFunctions.parseRegExp)(rgxCategory);
-
-              if (rgxCategory.test(category)) {
-                callback(drilldownLinkIndex, rows.filter(function (row) {
-                  return row[categoryColIndex] === category;
-                }));
-                return true;
-              }
-            }
-          });
-        }
-
-        if (!isOpen) {
-          callback(-1, []);
-        }
-      } // Derive the background and border colors from the base colors.
-
-
-      var bgColors = baseColors.map(function (color) {
-        return color.a(panel.dataBgColorAlpha).rgba();
-      });
-      var borderColors = baseColors.map(function (color) {
-        return color.l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba();
-      });
       var dataset = {
         label: categories,
         data: measures,
         borderWidth: 1,
         borderColor: borderColors,
-        backgroundColor: bgColors
+        backgroundColor: bgColors,
+        datalabels: panel.labels ? {
+          anchor: 'center',
+          display: 'auto',
+          backgroundColor: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
+          color: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'black' : 'white').rgb(),
+          borderRadius: 5,
+          formatter: formatLabel,
+          textAlign: 'center'
+        } : null
       };
       var chartConfig = {
         type: 'funnel',
-        // plugins: [ChartDataLabels],
         responsive: true,
         data: {
           datasets: [dataset],
@@ -1270,16 +1258,7 @@ function (_MetricsPanelCtrl) {
           gap: panel.gap,
           keep: /^(left|right)$/.test(panel.hAlign || '') ? panel.hAlign : 'auto',
           tooltips: {
-            callbacks: {
-              label: function label(tooltipItem, data) {
-                var numberFormat = panel.numberFormat,
-                    numberFormatDecimals = panel.numberFormatDecimals;
-                var label = data.datasets[tooltipItem.datasetIndex].label[tooltipItem.index];
-                var value = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
-                value = !['none', null, void 0].includes(numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(numberFormat)(value, numberFormatDecimals, null) : value;
-                return label + ': ' + value;
-              }
-            }
+            callbacks: tooltipCallbacks
           },
           legend: {
             display: panel.legend.isShowing,
@@ -1309,7 +1288,10 @@ function (_MetricsPanelCtrl) {
             }
           }
         }
-      };
+      }; // if (panel.labels.isShowing) {
+      //   chartConfig.plugins = [ChartDataLabels];
+      // }
+
       var myChart = new Chart(canvas.getContext('2d'), chartConfig);
     }
   }, {

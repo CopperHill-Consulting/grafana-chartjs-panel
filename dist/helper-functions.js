@@ -23,7 +23,7 @@ function wrapText(str, opt_max) {
   opt_max = Math.min(Math.max(1, ~~opt_max || 80), 200);
   var rgx = new RegExp("\\S{1,".concat(opt_max, "}|\\s{1,").concat(opt_max, "}"), 'g');
   var lastPart, wasNotWS;
-  return str.match(rgx).reduce(function (lines, part, partIndex, parts) {
+  return (str.match(rgx) || []).reduce(function (lines, part, partIndex, parts) {
     var isNotWS = /\S/.test(part);
 
     if (isNotWS) {

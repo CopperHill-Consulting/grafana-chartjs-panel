@@ -1,9 +1,14 @@
 # Changelog
 
-- **v2.4.0**
+- **v3.0.0**
+  - Added custom tooltips to all chart types.
+  - Added count types for all chart types.  The default is `sum` but other options are available.
+  - Added custom labels to pie charts and bar charts.
   - Added series to pie charts and doughnut charts.
   - Added ability to make borders darker and lighter for all chart types.
   - Added ability to wrap labels on pie charts.
+  - Added ability to `titlecase`, `uppercase` and `lowercase` values in tooltips.
+  - Restructured most of the code for building out the charts.
 
 - **v2.3.0**
   - Added bar pie graphs

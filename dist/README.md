@@ -89,5 +89,11 @@ If the custom tooltips section is available, you can use any of the following me
 
    - **`unique-list`** (eg. `${col:positionOrStage:unique-list}`):  This will concatenate all of the unique (sorted) values of the specified column with a comma and a space with the exception of the last value being concatenated to the values with the word "and" surrounded by spaces.  The concatenated list will serve as the value of the meta group.
 
+   - **`titlecase`** (eg. `${col:fullName:titlecase}`):  This will display the first value of the specified column with the first character of every word uppercased.
+
+   - **`uppercase`** (eg. `${col:fullName:uppercase}`):  This will display the first value of the specified column with all lowercased characters converted to uppercased characters.
+
+   - **`lowercase`** (eg. `${col:fullName:lowercase}`):  This will display the first value of the specified column with all uppercased characters converted to lowercased characters.
+
 ## License
 MIT

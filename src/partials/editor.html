@@ -20,6 +20,16 @@
     </div>
   </div>
 
+  <div ng-if="ctrl.isActiveOption('countType')" class="gf-form">
+    <span class="gf-form-label width-auto">Count Type</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().countType"
+        ng-options="ct.value as ct.text for ct in ctrl.COUNT_TYPES"
+        ng-change="ctrl.setPanelDefaults() + ctrl.renderNow()"></select>
+    </div>
+  </div>
+
   <div ng-if="ctrl.isActiveOption('isSemiCircle') && ctrl.getChartPanel().pieType !== 'polar'" class="gf-form">
     <gf-form-switch class="gf-form" label="Show As Semi-circle" label-class="width-auto" checked="ctrl.getChartPanel().isSemiCircle" on-change="ctrl.renderNow()"></gf-form-switch>
   </div>
@@ -176,19 +186,18 @@
 </div>
 <div class="section gf-form-group" ng-if="ctrl.isActiveOption('labels.isShowing')">
   <h5>Labels</h5>
-  <div class="gf-form">
-    <gf-form-switch class="gf-form" label="Show Labels" label-class="width-auto" checked="ctrl.getChartPanel().labels.isShowing" on-change="ctrl.renderNow()"></gf-form-switch>
+  <div ng-if="ctrl.isActiveOption('labels.isShowing')" class="gf-form">
+    <gf-form-switch class="gf-form" label="Is Showing" label-class="width-auto" checked="ctrl.getChartPanel().labels.isShowing" on-change="ctrl.renderNow()"></gf-form-switch>
   </div>
   <div ng-if="ctrl.getChartPanel().labels.isShowing">
     <div class="gf-form">
-      <span class="gf-form-label width-auto">Source</span>
-      <div class="gf-form-select-wrapper width-auto">
-        <select class="gf-form-input"
-          ng-model="ctrl.getChartPanel().labelColumnName"
-          ng-options="ct as (ct === null ? 'Value: Measure' : ('Column: ' + ct)) for ct in [null].concat(ctrl.data.columnTexts)"
-          ng-change="ctrl.renderNow()">
-        </select>
-      </div>
+      <label class="gf-form-label width-auto">Format</label>
+      <input type="text"
+        class="gf-form-input width-max"
+        ng-model="ctrl.getChartPanel().labels.format"
+        placeholder="eg. ${category}: ${measure}"
+        ng-blur="ctrl.renderNow()"
+      />
     </div>
     <div class="gf-form">
       <gf-form-switch class="gf-form" label="Black On White" label-class="width-auto" checked="ctrl.getChartPanel().labels.isBlackText" on-change="ctrl.renderNow()"></gf-form-switch>

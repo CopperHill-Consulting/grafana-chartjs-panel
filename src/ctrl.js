@@ -20,7 +20,10 @@ const COUNT_TYPE_MAP = {
   sum: _.sum,
   avg: _.mean,
   min: _.min,
-  max: _.max
+  max: _.max,
+  count: arr => arr.length,
+  first: arr => arr[0],
+  last: arr => arr[arr.length - 1],
 };
 
 const PANEL_DEFAULTS = {
@@ -43,12 +46,19 @@ const BAR_DEFAULTS = {
   dataBgColorAlpha: 0.75,
   dataBorderColorAlpha: 1,
   dataBorderBrightness: 0.5,
+  countType: 'sum',
   numberFormat: 'none',
   numberFormatDecimals: 0,
   tooltip: {
     isCustom: false,
     titleFormat:  null,
     labelFormat: null
+  },
+  labels: {
+    isShowing: false,
+    format: '${measure}',
+    isBlackText: IS_LIGHT_THEME,
+    wrapAfter: 25
   },
   legend: {
     isShowing: true,
@@ -89,8 +99,20 @@ const FUNNEL_DEFAULTS = {
   dataBgColorAlpha: 0.75,
   dataBorderColorAlpha: 1,
   dataBorderBrightness: 0.5,
+  countType: 'sum',
   numberFormat: 'none',
   numberFormatDecimals: 0,
+  tooltip: {
+    isCustom: false,
+    titleFormat:  null,
+    labelFormat: null
+  },
+  // labels: {
+  //   isShowing: false,
+  //   format: '${measure}',
+  //   isBlackText: IS_LIGHT_THEME,
+  //   wrapAfter: 25
+  // },
   gap: 1,
   startWidthPct: 0.5,
   legend: {
@@ -117,11 +139,18 @@ const PIE_DEFAULTS = {
   dataBgColorAlpha: 0.75,
   dataBorderBrightness: 0.5,
   dataBorderColorAlpha: 1,
+  countType: 'sum',
   numberFormat: 'none',
   numberFormatDecimals: 0,
+  tooltip: {
+    isCustom: false,
+    titleFormat:  null,
+    labelFormat: null
+  },
   labels: {
-    isShowing: true,
-    isBlackText: false,
+    isShowing: false,
+    format: '${measure}',
+    isBlackText: IS_LIGHT_THEME,
     wrapAfter: 25
   },
   legend: {
@@ -179,6 +208,11 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       { value: 'auto', text: 'Rainbow' },
       { value: 'custom', text: 'User-defined' }
     ];
+    this.CHART_LABEL_SOURCES = [
+      { value: null, text: 'None' },
+      { value: 'column', text: 'Column' },
+      { value: 'custom', text: 'User-defined' }
+    ];
     this.CHART_TYPES = [
       { value: null, 'text': '--- PICK ONE ---' },
       { value: 'bar', text: 'Bar' },
@@ -191,6 +225,9 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       { value: 'polar', text: 'Polar' },
       { value: 'doughnut', text: 'Doughnut' }
     ];
+    this.COUNT_TYPES = [{ value: null, text: '--- PICK ONE ---' }].concat(
+      Object.keys(COUNT_TYPE_MAP).map(t => ({ value: t, text: JS.titleCase(t) }))
+    );
     this.CHART_ORIENTATIONS = [
       { value: 'horizontal', text: 'Horizontal (\u2194)' },
       { value: 'vertical', text: 'Vertical (\u2195)' }
@@ -257,50 +294,6 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     }
   }
 
-  formatTooltipText(strFormat, rowsByColName, series, category, measure) {
-    return strFormat.replace(
-      /(\\\$)|\$\{(?:(series)|(category)|measure|col:((?:[^\\\}:]+|\\.)+)(?::([\-\w]+))?)\}/g,
-      function (match, isEscapedDollar, isSeries, isCategory, colName, colFnName) {
-        if (isEscapedDollar) {
-          match = '$';
-        }
-        else if (colName) {
-          colName = colName.replace(/\\(.)/g, '$1');
-          if (_.has(rowsByColName[0], colName)) {
-            match = rowsByColName.map(row => row[colName]);
-            match = colFnName === 'sum'
-              ? match.reduce((a, b) => a + b)
-              : colFnName === 'avg'
-                ? match.reduce((a, b) => a + b) / match.length
-                : colFnName === 'max'
-                  ? match.reduce((a, b) => a > b ? a : b)
-                  : colFnName === 'min'
-                    ? match.reduce((a, b) => a < b ? a : b)
-                    : colFnName === 'first'
-                      ? match[0]
-                      : colFnName === 'last'
-                        ? match[match.length - 1]
-                        : colFnName === 'count'
-                          ? match.length
-                          : colFnName === 'unique-count'
-                            ? new Set(match).size
-                            : colFnName === 'list'
-                              ? match.sort().reduce((a, b, c, d) => a + (c + 1 === d.length ? ' and ' : ', ') + b)
-                              : colFnName === 'unique-list'
-                                ? Array.from(new Set(match)).sort().reduce((a, b, c, d) => a + (c + 1 === d.length ? ' and ' : ', ') + b)
-                                : match.join(',');
-          }
-        }
-        else {
-          match = isSeries ? series : isCategory ? category : measure;
-        }
-        return 'number' === typeof match
-          ? +match.toFixed(5)
-          : match;
-      }
-    )
-  }
-
   addSeriesColor(opt_index) {
     let panel = this.panel;
     let colors = panel[panel.chartType].seriesColors;
@@ -358,22 +351,27 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
 
   onDataReceived(dataList) {
     if (dataList && dataList.length) {
-      let data = dataList[0];
-      let { type, columns, rows } = data;
+      let { type, columns, rows } = dataList[0];
       let columnTexts = columns.map(col => 'string' === typeof col ? col : col.text);
-      let colIndexesByText = columnTexts.reduceRight(
-        (indexes, colText, index) =>
-          Object.assign(indexes, { [colText]: index }),
-        {}
-      );
-      let rowsByColName = rows.map(
-        (cells, rowIndex) =>
-          cells.reduce(
+      rows.map(
+        row => Object.assign(row, {
+          byColName: row.reduce(
             (carry, cellValue, cellIndex) => Object.assign(carry, { [columnTexts[cellIndex]]: cellValue }),
             {}
           )
+        })
       );
-      this.data = { type, columns, rows, columnTexts, colIndexesByText, rowsByColName };
+      this.data = {
+        type,
+        columns,
+        rows,
+        columnTexts,
+        colIndexesByText: columnTexts.reduceRight(
+          (indexes, colText, index) =>
+            Object.assign(indexes, { [colText]: index }),
+          {}
+        )
+      };
     }
     else {
       this.data = {};
@@ -473,15 +471,13 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     let { rows, colIndexesByText } = data;
     let fullPanel = ctrl.panel;
     let panel = fullPanel[chartType];
-    let { colorSource, seriesColors, colorColumnName, colorBy, sortOrder } = panel;
-
-    let countType = panel.countType || 'sum';
+    let { colorSource, seriesColors, colorColumnName, colorBy, sortOrder, countType, labels: labelOptions } = panel;
 
     let categoryColIndex = ctrl.getColIndex('category', panel);
     let seriesColIndex = panel.pieType === 'polar' ? -1 : ctrl.getColIndex('series', panel, true);
     let measureColIndex = ctrl.getColIndex('measure', panel);
     let labelColIndex = ctrl.getColIndex('label', panel, true);
-    let colorColIndex = colorBy === 'column' ? ctrl.getColIndex('color', panel, true) : -1;
+    let colorColIndex = colorSource === 'column' ? ctrl.getColIndex('color', panel, true) : -1;
     let stackColIndex = ctrl.getColIndex('stack', panel, true);
     let ignoreSeries = seriesColIndex < 0;
 
@@ -495,16 +491,16 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     let categoryCount = categories.length;
     let seriesCount = series.length;
     let measureCount = categoryCount * seriesCount;
-    let { measures, labels, colors, rowsByMeasure, seriesStacks } = rows.reduce((carry, row, rowIndex) => {
+    let { measures, labels, colors, rowGroups, seriesStacks } = rows.reduce((carry, row, rowIndex) => {
       let seriesIndex = series.indexOf(row[seriesColIndex]);
-      let index = categories.indexOf(row[categoryColIndex]) + seriesIndex * categoryCount;
-      (carry.measures[index] = carry.measures[index] || []).push(row[measureColIndex]);
-      (carry.rowsByMeasure[index] = carry.rowsByMeasure[index] || []).push(row);
-      carry.labels[index] = carry.labels[index] || row[labelColIndex];
-      carry.colors[index] = carry.colors[index] || row[colorColIndex];
+      let measureIndex = categories.indexOf(row[categoryColIndex]) + seriesIndex * categoryCount;
+      (carry.measures[measureIndex] = carry.measures[measureIndex] || []).push(row[measureColIndex]);
+      (carry.rowGroups[measureIndex] = carry.rowGroups[measureIndex] || []).push(row);
+      carry.labels[measureIndex] = carry.labels[measureIndex] || row[labelColIndex];
+      carry.colors[measureIndex] = carry.colors[measureIndex] || row[colorColIndex];
       carry.seriesStacks[seriesIndex] = carry.seriesStacks[seriesIndex] || row[stackColIndex];
       return carry;
-    }, { measures: [], labels: [], colors: [], rowsByMeasure: [], seriesStacks: [] });
+    }, { measures: [], labels: [], colors: [], rowGroups: [], seriesStacks: [] });
 
     let countMeasures = COUNT_TYPE_MAP[countType];
     if (!countMeasures) {
@@ -512,7 +508,16 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     }
     for (let i = measureCount; i--; ) {
       measures[i] = countMeasures(measures[i] || [0]);
-      rowsByMeasure[i] = rowsByMeasure[i] || [];
+      rowGroups[i] = rowGroups[i] || [];
+    }
+
+    if (chartType === 'funnel') {
+      let sortMap = measures.map((v, i) => ({ v, i })).sort(sortOrder === 'desc' ? (a, b) => b.v - a.v : (a, b) => a.v - b.v).map(({ i }) => i);
+      let remap = (v, i, a) => a[sortMap[i]];
+      measures = measures.map(remap);
+      labels = labels.map(remap);
+      colors = colors.map(remap);
+      rowGroups = rowGroups.map(remap);
     }
 
     let baseColors;
@@ -555,6 +560,140 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     let bgColors = baseColors.map(color => Color(color).a(panel.dataBgColorAlpha).rgba());
     let borderColors = baseColors.map(color => Color(color).l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba());
 
+    function formatLabelText(strFormat, rows, series, category, measure) {
+      return strFormat.replace(
+        /(\\\$)|\$\{(?:(series)|(category)|measure|col:((?:[^\\\}:]+|\\.)+)(?::([\-\w]+))?)\}/g,
+        function (match, isEscapedDollar, isSeries, isCategory, colName, colFnName) {
+          if (isEscapedDollar) {
+            match = '$';
+          }
+          else if (colName) {
+            colName = colName.replace(/\\(.)/g, '$1');
+            if (_.has(rows[0].byColName, colName)) {
+              match = rows.map(row => row.byColName[colName]);
+              match = colFnName === 'sum'
+                ? match.reduce((a, b) => a + b)
+                : colFnName === 'avg'
+                  ? match.reduce((a, b) => a + b) / match.length
+                  : colFnName === 'max'
+                    ? match.reduce((a, b) => a > b ? a : b)
+                    : colFnName === 'min'
+                      ? match.reduce((a, b) => a < b ? a : b)
+                      : colFnName === 'first'
+                        ? match[0]
+                        : colFnName === 'last'
+                          ? match[match.length - 1]
+                          : colFnName === 'count'
+                            ? match.length
+                            : colFnName === 'unique-count'
+                              ? new Set(match).size
+                              : colFnName === 'list'
+                                ? match.sort().reduce((a, b, c, d) => a + (c + 1 === d.length ? ' and ' : ', ') + b)
+                                : colFnName === 'unique-list'
+                                  ? Array.from(new Set(match)).sort().reduce((a, b, c, d) => a + (c + 1 === d.length ? ' and ' : ', ') + b)
+                                  : match.join(',');
+            }
+          }
+          else {
+            match = isSeries ? series : isCategory ? category : measure;
+          }
+          return 'number' === typeof match
+            ? +match.toFixed(5)
+            : match;
+        }
+      )
+    }
+
+    function getLabelFormatter(defaultFormat, labelType = 'tooltip') {
+      labelType = labelType.toLowerCase();
+      let isForChart = labelType === 'chart';
+      let isForTooltip = labelType === 'tooltip';
+      if (!(isForChart || isForTooltip)) {
+        throw new Error(`Unknown label format:\t${labelType}`);
+      }
+      return function () {
+        if (isForTooltip) {
+          let tooltipItems = arguments[0];
+          var isForTitle = Array.isArray(tooltipItems);
+          var { datasetIndex: seriesIndex, index: categoryIndex } = isForTitle ? tooltipItems[0] : tooltipItems;
+        }
+        else {
+          let labelItem = arguments[1];
+          var isForTitle = false;
+          var { datasetIndex: seriesIndex, dataIndex: categoryIndex } = labelItem;
+        }
+        let category = categories[categoryIndex];
+        let seriesName = series[seriesIndex];
+        let measureIndex = categoryIndex + seriesIndex * categoryCount;
+
+        let measure = measures[measureIndex];
+        let rows = rowGroups[measureIndex];
+        let { numberFormat, numberFormatDecimals } = panel;
+        let { isCustom, titleFormat, labelFormat } = panel.tooltip;
+        let strMeasure = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof measure)
+            ? getValueFormat(numberFormat)(measure, numberFormatDecimals, null)
+            : measure;
+        let strFormat = (
+          isForTooltip
+          ? (isCustom && (isForTitle ? titleFormat : labelFormat))
+          : labelOptions.format
+        ) || defaultFormat;
+
+        let strResult = strFormat.replace(
+          /(\\\$)|\$\{(?:(series)|(category)|measure|col:((?:[^\\\}:]+|\\.)+)(?::([\-\w]+))?)\}/g,
+          function (match, isEscapedDollar, isSeries, isCategory, colName, colFnName) {
+            if (isEscapedDollar) {
+              match = '$';
+            }
+            else if (colName) {
+              colName = colName.replace(/\\(.)/g, '$1');
+              if (_.has(rows[0].byColName, colName)) {
+                match = rows.map(row => row.byColName[colName]);
+                match = colFnName === 'sum'
+                  ? match.reduce((a, b) => a + b)
+                  : colFnName === 'avg'
+                    ? match.reduce((a, b) => a + b) / match.length
+                    : colFnName === 'max'
+                      ? match.reduce((a, b) => a > b ? a : b)
+                      : colFnName === 'min'
+                        ? match.reduce((a, b) => a < b ? a : b)
+                        : colFnName === 'first'
+                          ? match[0]
+                          : colFnName === 'last'
+                            ? match[match.length - 1]
+                            : colFnName === 'count'
+                              ? match.length
+                              : colFnName === 'unique-count'
+                                ? new Set(match).size
+                                : colFnName === 'list'
+                                  ? match.sort().reduce((a, b, c, d) => a + (c + 1 === d.length ? ' and ' : ', ') + b)
+                                  : colFnName === 'unique-list'
+                                    ? Array.from(new Set(match)).sort().reduce((a, b, c, d) => a + (c + 1 === d.length ? ' and ' : ', ') + b)
+                                    : colFnName === 'titlecase'
+                                      ? JS.titleCase(match[0] + '')
+                                      : colFnName === 'uppercase'
+                                        ? (match[0] + '').toUpperCase()
+                                        : colFnName === 'lowercase'
+                                          ? (match[0] + '').toLowerCase()
+                                          : match.join(',');
+              }
+            }
+            else {
+              // coerces to strings while making sure that undefined and null become empty strings
+              match = [] + [isSeries ? seriesName : isCategory ? category : strMeasure];
+            }
+            return 'number' === typeof match
+              ? +match.toFixed(5)
+              : match;
+          }
+        ) || '';
+        
+        return isForChart
+          ? wrapText(strResult, labelOptions.wrapAfter)
+          : strResult;
+      }
+    }
+
     return {
       ctrl,
       data,
@@ -578,11 +717,16 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       measures,
       measureCount,
       labels,
-      rowsByMeasure,
+      rowGroups,
       baseColors,
       bgColors,
       borderColors,
       sortOrder,
+      formatLabel: getLabelFormatter('${category}: ${measure}', 'chart'),
+      tooltipCallbacks: {
+        title: getLabelFormatter('${series}'),
+        label: getLabelFormatter('${category}: ${measure}')
+      },
       testChartEvent(e, callback) {
         let elem = this.getElementAtEvent(e)[0];
         let isOpen;
@@ -597,7 +741,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
               if (parseRegExp(rgxCategory).test(category) && (ignoreSeries || parseRegExp(rgxSeries).test(seriesName))) {
                 callback(
                   drilldownLinkIndex,
-                  rowsByMeasure[categoryIndex + seriesIndex * categoryCount]
+                  rowGroups[categoryIndex + seriesIndex * categoryCount]
                 );
                 return true;
               }
@@ -622,9 +766,10 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       series,
       categoryCount,
       measures,
-      labels,
       bgColors,
       borderColors,
+      tooltipCallbacks,
+      formatLabel,
       testChartEvent
     } = this.getChartOptions('pie');
 
@@ -642,16 +787,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
           backgroundColor: Color(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
           color: Color(panel.labels.isBlackText ? 'black' : 'white').rgb(),
           borderRadius: 5,
-          formatter(value, { dataIndex, datasetIndex }) {
-            let result = labels[dataIndex + datasetIndex * categoryCount];
-            if (labelColIndex < 0) {
-              let { numberFormat, numberFormatDecimals } = panel;
-              result = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
-                ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
-                : value;
-            }
-            return wrapText(`${result}`, panel.labels.wrapAfter);
-          },
+          formatter: formatLabel,
           textAlign: 'center'
         }
       };
@@ -661,29 +797,14 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       responsive: true,
       data: {
         datasets,
-        labels: 'string' === typeof datasets[0].label
-          ? datasets[0].data.map((x, i) => `${datasets[0].label} #${i + 1}`)
-          : datasets[0].label
+        labels: datasets[0].label
       },
       options: {
         circumference: (panel.isSemiCircle ? 1 : 2) * Math.PI,
         rotation: -Math.PI / (panel.isSemiCircle ? 1 : 2),
         elements: { borderWidth: panel.borderWidth },
         tooltips: {
-          callbacks: {
-            title: function ([tooltipItem], data) {
-              return series[tooltipItem.datasetIndex];
-            },
-            label: function (tooltipItem, data) {
-              let { numberFormat, numberFormatDecimals } = panel;
-              let label = data.datasets[tooltipItem.datasetIndex].label[tooltipItem.index];
-              let value = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
-              value = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
-                ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
-                : value;
-              return label + ': ' + value;
-            }
-          }
+          callbacks: tooltipCallbacks
         },
         legend: {
           display: panel.legend.isShowing,
@@ -730,35 +851,20 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   }
 
   drawBarChart(canvas) {
-    // TODO: Remove unused variables
     let {
       ctrl,
-      data,
-      rows,
-      colIndexesByText,
-      fullPanel,
       panel,
-      countType,
-      categoryColIndex,
-      seriesColIndex,
-      measureColIndex,
-      labelColIndex,
-      colorColIndex,
-      stackColIndex,
       seriesStacks,
       ignoreSeries,
       categories,
       series,
       categoryCount,
-      seriesCount,
       measures,
-      measureCount,
-      labels,
-      rowsByMeasure,
-      baseColors,
+      rowGroups,
       bgColors,
       borderColors,
-      sortOrder,
+      tooltipCallbacks,
+      formatLabel,
       testChartEvent
     } = this.getChartOptions('bar');
 
@@ -776,7 +882,16 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         borderWidth: panel.borderWidth,
         borderColor: borderColors.filter(fnFilter),
         backgroundColor: bgColors.filter(fnFilter),
-        stack: panel.isStacked ? seriesStacks[seriesIndex] : seriesIndex
+        stack: panel.isStacked ? seriesStacks[seriesIndex] : seriesIndex,
+        datalabels: {
+          anchor: 'center',
+          display: 'auto',
+          backgroundColor: Color(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
+          color: Color(panel.labels.isBlackText ? 'black' : 'white').rgb(),
+          borderRadius: 5,
+          formatter: formatLabel,
+          textAlign: 'center'
+        }
       };
     });
     
@@ -791,44 +906,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         responsive: true,
         tooltips: {
           mode: 'point',
-          callbacks: {
-            title: function ([tooltipItem], data) {
-              if (!ignoreSeries) {
-                let { datasets, labels } = data;
-                let { datasetIndex: seriesIndex, index: categoryIndex } = tooltipItem;
-                let category = categories[categoryIndex];
-                let seriesName = series[seriesIndex];
-                let measureIndex = categoryIndex + seriesIndex * categoryCount;
-                let measure = measures[measureIndex];
-                let rows = rowsByMeasure[measureIndex];
-                let { isCustom, titleFormat } = panel.tooltip;
-
-                return (isCustom)
-                  ? titleFormat
-                    ? ctrl.formatTooltipText(titleFormat, rows, seriesName, category, measure)
-                    : null
-                  : seriesName;
-              }
-            },
-            label: function (tooltipItem, data) {
-              let { datasets, labels } = data;
-              let { datasetIndex: seriesIndex, index: categoryIndex } = tooltipItem;
-              let category = categories[categoryIndex];
-              let seriesName = series[seriesIndex];
-              let measureIndex = categoryIndex + seriesIndex * categoryCount;
-              let measure = measures[measureIndex];
-              let rows = rowsByMeasure[measureIndex];
-              let { numberFormat, numberFormatDecimals } = panel;
-              let { isCustom, labelFormat } = panel.tooltip;
-              let strMeasure = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof measure)
-                  ? getValueFormat(numberFormat)(measure, numberFormatDecimals, null)
-                  : measure;
-              
-              return (isCustom && labelFormat)
-                ? ctrl.formatTooltipText(labelFormat, rows, seriesName, category, measure)
-                : (category + ': ' + strMeasure);
-            }
-          }
+          callbacks: tooltipCallbacks
         },
         legend: {
           display: panel.legend.isShowing,
@@ -900,104 +978,51 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       }
     };
 
+    if (panel.labels.isShowing) {
+      chartConfig.plugins = [ChartDataLabels];
+    }
+
     let myChart = new Chart(canvas.getContext('2d'), chartConfig);
   }
 
   drawFunnelChart(canvas) {
-    let ctrl = this;
-    let data = ctrl.data;
-    let { rows, colIndexesByText } = data;
-    let fullPanel = ctrl.panel;
-    let panel = fullPanel.funnel;
-
-    let categoryColIndex = ctrl.getColIndex('category', panel);
-    let measureColIndex = ctrl.getColIndex('measure', panel);
-
-    let categories = _.uniq(rows.map(row => row[categoryColIndex]));
-    let measures = rows.reduce((measures, row, rowIndex) => {
-      let measureIndex = categories.indexOf(row[categoryColIndex]);
-      measures[measureIndex] = (measures[measureIndex] || 0) + row[measureColIndex];
-      return measures;
-    }, []);
-
-    let baseColors;
-    let { colorSource, seriesColors, colorColumnName, sortOrder } = panel;
-
-    if (colorSource === 'column') {
-      if (!_.has(colIndexesByText, colorColumnName)) {
-        throw new Error('Invalid color column.');
-      }
-      baseColors = categories.map(category => Color(rows.find(row => row[categoryColIndex] === category)[colIndexesByText[colorColumnName]]));
-    }
-    else if (colorSource === 'custom') {
-      baseColors = categories.map((category, index, categories) => {
-        return Color(seriesColors[index % seriesColors.length]);
-      });
-    }
-    else {
-      baseColors = categories.map((category, index, categories) => {
-        return Color.hsl(~~(360 * index / categories.length), 1, 0.5);
-      });
-    }
-
-    // Sort the measures and then the categories accordingly.
-    let altBaseColors;
-    measures = measures.map((value, index) => ({ index, value }));
-    measures.sort(sortOrder === 'desc' ? (a, b) => b.value - a.value : (a, b) => a.value - b.value);
-    [altBaseColors, categories, measures] = measures.reduce((carry, measure, index) => {
-      let [altBaseColors, newCategories, newMeasures] = carry;
-      altBaseColors.push(baseColors[measure.index]);
-      newCategories.push(categories[measure.index]);
-      newMeasures.push(measure.value);
-      return carry;
-    }, [[], [], []]);
-
-    // If using a column as the source of the colors make sure to order them according to the categories.
-    if (colorSource === 'column') {
-      baseColors = altBaseColors;
-    }
-
-    function testChartEvent(e, callback) {
-      let elem = this.getElementAtEvent(e)[0];
-      let isOpen;
-      if (elem) {
-        let category = categories[elem._index];
-        isOpen = panel.drilldownLinks.some((drilldownLink, drilldownLinkIndex) => {
-          // Check this link to see if it matches...
-          let { url, category: rgxCategory } = drilldownLink;
-          if (url) {
-            rgxCategory = parseRegExp(rgxCategory);
-            if (rgxCategory.test(category)) {
-              callback(
-                drilldownLinkIndex,
-                rows.filter(row => row[categoryColIndex] === category)
-              );
-              return true;
-            }
-          }
-        });
-      }
-
-      if (!isOpen) {
-        callback(-1, []);
-      }
-    }
-
-    // Derive the background and border colors from the base colors.
-    let bgColors = baseColors.map(color => color.a(panel.dataBgColorAlpha).rgba());
-    let borderColors = baseColors.map(color => color.l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba());
+    let {
+      ctrl,
+      panel,
+      ignoreSeries,
+      categories,
+      series,
+      categoryCount,
+      measures,
+      rowGroups,
+      bgColors,
+      borderColors,
+      tooltipCallbacks,
+      formatLabel,
+      testChartEvent
+    } = this.getChartOptions('funnel');
 
     let dataset = {
       label: categories,
       data: measures,
       borderWidth: 1,
       borderColor: borderColors,
-      backgroundColor: bgColors
+      backgroundColor: bgColors,
+      datalabels: panel.labels
+        ? {
+          anchor: 'center',
+          display: 'auto',
+          backgroundColor: Color(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
+          color: Color(panel.labels.isBlackText ? 'black' : 'white').rgb(),
+          borderRadius: 5,
+          formatter: formatLabel,
+          textAlign: 'center'
+        }
+        : null
     };
 
     let chartConfig = {
       type: 'funnel',
-      // plugins: [ChartDataLabels],
       responsive: true,
       data: {
         datasets: [ dataset ],
@@ -1012,17 +1037,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         gap: panel.gap,
         keep: /^(left|right)$/.test(panel.hAlign || '') ? panel.hAlign : 'auto',
         tooltips: {
-          callbacks: {
-            label: function (tooltipItem, data) {
-              let { numberFormat, numberFormatDecimals } = panel;
-              let label = data.datasets[tooltipItem.datasetIndex].label[tooltipItem.index];
-              let value = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
-              value = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
-                ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
-                : value;
-              return label + ': ' + value;
-            }
-          }
+          callbacks: tooltipCallbacks
         },
         legend: {
           display: panel.legend.isShowing,
@@ -1053,6 +1068,10 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         }
       }
     };
+
+    // if (panel.labels.isShowing) {
+    //   chartConfig.plugins = [ChartDataLabels];
+    // }
 
     let myChart = new Chart(canvas.getContext('2d'), chartConfig);
   }

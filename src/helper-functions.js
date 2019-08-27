@@ -17,7 +17,7 @@ function wrapText(str, opt_max) {
   opt_max = Math.min(Math.max(1, ~~opt_max || 80), 200);
   let rgx = new RegExp(`\\S{1,${opt_max}}|\\s{1,${opt_max}}`, 'g');
   let lastPart, wasNotWS;
-  return str.match(rgx).reduce(function (lines, part, partIndex, parts) {
+  return (str.match(rgx) || []).reduce(function (lines, part, partIndex, parts) {
     let isNotWS = /\S/.test(part);
     if (isNotWS) {
       let lineCount = lines.length;
