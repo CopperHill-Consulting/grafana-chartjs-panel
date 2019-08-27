@@ -80,4 +80,14 @@
       </select>
     </div>
   </div>
+  <div ng-if="ctrl.getChartPanel().borderWidth &gt; 0 &amp;&amp; ctrl.getChartPanel().dataBorderColorAlpha > 0 &amp;&amp; ctrl.isActiveOption('dataBorderBrightness')" class="gf-form">
+    <span class="gf-form-label width-auto">Data Border Brightness</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().dataBorderBrightness"
+        ng-options="ca.value as ca.text for ca in ctrl.BRIGHTNESSES"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
 </div>

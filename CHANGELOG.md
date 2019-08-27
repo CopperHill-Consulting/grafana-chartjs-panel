@@ -1,5 +1,10 @@
 # Changelog
 
+- **v2.4.0**
+  - Added series to pie charts and doughnut charts.
+  - Added ability to make borders darker and lighter for all chart types.
+  - Added ability to wrap labels on pie charts.
+
 - **v2.3.0**
   - Added bar pie graphs
   - Added doughnut graphs

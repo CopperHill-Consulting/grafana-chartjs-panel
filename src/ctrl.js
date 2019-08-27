@@ -9,7 +9,7 @@ import * as ChartDataLabels from './external/Chart.datalabels.plugin';
 import './external/Chart.funnel';
 import { Color } from './external/CWest-Color.min';
 
-import { parseRegExp } from './helper-functions';
+import { parseRegExp, wrapText } from './helper-functions';
 
 const RGX_CELL_PLACEHOLDER = /\$\{(time)(?:-(to|from))?\}|\$\{(col|var):((?:[^\}:\\]*|\\.)+)(?::(?:(raw)|(param)(?::((?:[^\}:\\]*|\\.)+))?))?\}/g;
 const RGX_OLD_VAR_WORKAROUND = /([\?&])var-(\$\{var:(?:[^\}:\\]*|\\.)+:param\})/g;
@@ -33,6 +33,7 @@ const BAR_DEFAULTS = {
   isStacked: false,
   dataBgColorAlpha: 0.75,
   dataBorderColorAlpha: 1,
+  dataBorderBrightness: 0.5,
   numberFormat: 'none',
   numberFormatDecimals: 0,
   tooltip: {
@@ -79,6 +80,7 @@ const FUNNEL_DEFAULTS = {
   seriesColors: [],
   dataBgColorAlpha: 0.75,
   dataBorderColorAlpha: 1,
+  dataBorderBrightness: 0.5,
   numberFormat: 'none',
   numberFormatDecimals: 0,
   gap: 1,
@@ -96,20 +98,24 @@ const PIE_DEFAULTS = {
   pieType: 'pie',
   isSemiCircle: false,
   categoryColumnName: null,
+  seriesColumnName: null,
   measureColumnName: null,
   labelColumnName: null,
   drilldownLinks: [],
   borderWidth: 1,
+  colorBy: 'both',
   colorSource: 'auto',
   colorColumnName: null,
   seriesColors: [],
   dataBgColorAlpha: 0.75,
+  dataBorderBrightness: 0.5,
   dataBorderColorAlpha: 1,
   numberFormat: 'none',
   numberFormatDecimals: 0,
   labels: {
     isShowing: true,
-    isBlackText: false
+    isBlackText: false,
+    wrapAfter: 25
   },
   legend: {
     isShowing: true,
@@ -194,6 +200,9 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     ];
     this.COLOR_ALPHAS = _.range(0, 101, 5).map(x => ({
       value: x / 100, text: `${x}%` + (x ? x === 100 ? ' (Solid)' : '' : ' (Invisible)')
+    }));
+    this.BRIGHTNESSES = _.range(0, 101, 5).map(x => ({
+      value: x / 100, text: `${x}%` + (x ? x === 100 ? ' (White)' : '' : ' (Black)')
     }));
     this.TICK_ROTATIONS = _.range(0, 91, 5).map(x => ({
       value: x, text: `${x}\xB0` + (x ? x === 90 ? ' (Vertical)' : '' : ' (Horizontal)')
@@ -460,58 +469,65 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     let panel = fullPanel.pie;
 
     let categoryColIndex = ctrl.getColIndex('category', panel);
-    // let seriesColIndex = ctrl.getColIndex('series', panel);
+    let seriesColIndex = panel.pieType === 'polar' ? -1 : ctrl.getColIndex('series', panel, true);
     let measureColIndex = ctrl.getColIndex('measure', panel);
     let labelColIndex = ctrl.getColIndex('label', panel, true);
+    let colorColIndex = ctrl.getColIndex('color', panel, true);
+    let ignoreSeries = seriesColIndex < 0;
 
     let categories = _.uniq(rows.map(row => row[categoryColIndex])).reverse();
-    let measures = rows.reduce((measures, row, rowIndex) => {
-      let measureIndex = categories.indexOf(row[categoryColIndex]);
-      measures[measureIndex] = (measures[measureIndex] || 0) + row[measureColIndex];
-      return measures;
-    }, []);
-    let labels = rows.reduce((labels, row, rowIndex) => {
-      let labelIndex = categories.indexOf(row[categoryColIndex]);
-      labels[labelIndex] = labels[labelIndex] || row[labelColIndex];
-      return labels;
-    }, []);
+    let series = _.uniq(rows.map(row => row[seriesColIndex])).reverse();
+    let categoryCount = categories.length;
+    let seriesCount = series.length;
+    let measureCount = categoryCount * seriesCount;
+    let { measures, labels, colors } = rows.reduce((carry, row, rowIndex) => {
+      let category = row[categoryColIndex];
+      let categoryIndex = categories.indexOf(category);
+      let seriesName = row[seriesColIndex];
+      let seriesIndex = series.indexOf(seriesName);
+      let index = categoryIndex + seriesIndex * categoryCount;
+      carry.measures[index] = (carry.measures[index] || 0) + row[measureColIndex];
+      carry.labels[index] = carry.labels[index] || row[labelColIndex];
+      carry.colors[index] = carry.colors[index] || row[colorColIndex];
+      return carry;
+    }, { measures: [], labels: [], colors: [] });
 
     let baseColors;
-    let { colorSource, seriesColors, colorColumnName, sortOrder } = panel;
+    let { colorSource, seriesColors, colorColumnName, colorBy, sortOrder } = panel;
+    let seriesColorCount = seriesColors.length;
     let isLightTheme = config.theme.type === 'light';
 
     if (colorSource === 'column') {
       if (!_.has(colIndexesByText, colorColumnName)) {
         throw new Error('Invalid color column.');
       }
-      baseColors = categories.map(category => Color(rows.find(row => row[categoryColIndex] === category)[colIndexesByText[colorColumnName]]));
-    }
-    else if (colorSource === 'custom') {
-      baseColors = categories.map((category, index, categories) => {
-        return Color(seriesColors[index % seriesColors.length]);
-      });
+      baseColors = colors.map(x => Color(x));
     }
     else {
-      baseColors = categories.map((category, index, categories) => {
-        return Color.hsl(~~(360 * index / categories.length), 1, 0.5);
-      });
-    }
-
-    // Sort the measures and then the categories accordingly.
-    let altBaseColors;
-    measures = measures.map((value, index) => ({ index, value }));
-    //measures.sort(sortOrder === 'desc' ? (a, b) => b.value - a.value : (a, b) => a.value - b.value);
-    [altBaseColors, categories, measures] = measures.reduce((carry, measure, index) => {
-      let [altBaseColors, newCategories, newMeasures] = carry;
-      altBaseColors.push(baseColors[measure.index]);
-      newCategories.push(categories[measure.index]);
-      newMeasures.push(measure.value);
-      return carry;
-    }, [[], [], []]);
-
-    // If using a column as the source of the colors make sure to order them according to the categories.
-    if (colorSource === 'column') {
-      baseColors = altBaseColors;
+      baseColors = [];
+      if (colorSource === 'custom') {
+        if (!seriesColorCount) {
+          throw new Error('No base colors have been added.');
+        }
+        seriesColors = seriesColors.map(x => Color(x));
+        series.forEach(function(seriesName, seriesIndex) {
+          categories.forEach(function(category, categoryIndex) {
+            let index = categoryIndex + seriesIndex * categoryCount;
+            let colorIndex = colorBy === 'series' ? seriesIndex : colorBy === 'both' ? index : categoryIndex;
+            baseColors[index] = seriesColors[colorIndex % seriesColorCount];
+          });
+        });
+      }
+      else {
+        series.forEach(function(seriesName, seriesIndex) {
+          categories.forEach(function(category, categoryIndex) {
+            let index = categoryIndex + seriesIndex * categoryCount;
+            let colorIndex = colorBy === 'series' ? seriesIndex : colorBy === 'both' ? index : categoryIndex;
+            let colorCount = colorBy === 'series' ? seriesCount : colorBy === 'both' ? measureCount : categoryCount;
+            baseColors[index] = Color.hsl(Math.round(360 * colorIndex / colorCount), 1, 0.5);
+          });
+        });
+      }
     }
 
     function testChartEvent(e, callback) {
@@ -542,14 +558,14 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
 
     // Derive the background and border colors from the base colors.
     let bgColors = baseColors.map(color => color.a(panel.dataBgColorAlpha).rgba());
-    let borderColors = baseColors.map(color => color.a(panel.dataBorderColorAlpha).rgba());
+    let borderColors = baseColors.map(color => color.l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba());
 
-    let dataset = {
+    let datasets = series.map((seriesName, seriesIndex) => ({
       label: categories,
-      data: measures,
+      data: measures.filter((measure, measureIndex) => ~~(measureIndex / categoryCount) === seriesIndex),
       borderWidth: panel.borderWidth,
-      borderColor: borderColors,
-      backgroundColor: bgColors,
+      borderColor: borderColors.filter((measure, measureIndex) => ~~(measureIndex / categoryCount) === seriesIndex),
+      backgroundColor: bgColors.filter((measure, measureIndex) => ~~(measureIndex / categoryCount) === seriesIndex),
       datalabels: {
         anchor: 'center',
         display: 'auto',
@@ -557,26 +573,26 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         color: Color(panel.labels.isBlackText ? 'black' : 'white').rgb(),
         borderRadius: 5,
         formatter(value, { dataIndex, datasetIndex }) {
+          let result = labels[dataIndex + datasetIndex * categoryCount];
           if (labelColIndex < 0) {
             let { numberFormat, numberFormatDecimals } = panel;
-            let label = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
+            result = (!['none', null, void 0].includes(numberFormat) && 'number' === typeof value)
               ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
               : value;
-            return label;
           }
-          return labels[dataIndex];
+          return wrapText(`${result}`, panel.labels.wrapAfter);
         },
         textAlign: 'center'
       }
-    };
+    }));
 
     let chartConfig = {
       responsive: true,
       data: {
-        datasets: [dataset],
-        labels: 'string' === typeof dataset.label
-          ? dataset.data.map((x, i) => `${dataset.label} #${i + 1}`)
-          : dataset.label
+        datasets,
+        labels: 'string' === typeof datasets[0].label
+          ? datasets[0].data.map((x, i) => `${datasets[0].label} #${i + 1}`)
+          : datasets[0].label
       },
       options: {
         circumference: (panel.isSemiCircle ? 1 : 2) * Math.PI,
@@ -584,6 +600,9 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         elements: { borderWidth: panel.borderWidth },
         tooltips: {
           callbacks: {
+            title: function ([tooltipItem], data) {
+              return series[tooltipItem.datasetIndex];
+            },
             label: function (tooltipItem, data) {
               let { numberFormat, numberFormatDecimals } = panel;
               let label = data.datasets[tooltipItem.datasetIndex].label[tooltipItem.index];
@@ -691,7 +710,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
     let baseColors = series.map((seriesName, seriesIndex) => {
       return categories.map((catName, catIndex) => {
         if (colorSource === 'column' && colorColIndex >= 0) { // column
-          for (var row, rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+          for (let row, rowIndex = 0; rowIndex < rowCount; rowIndex++) {
             row = rows[rowIndex];
             if ((seriesColIndex < 0 || row[seriesColIndex] === seriesName) && row[categoryColIndex] === catName) {
               return Color(row[colorColIndex]);
@@ -753,7 +772,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         datasets: series.map((seriesName, seriesNameIndex) => ({
           label: seriesName,
           backgroundColor: baseColors[seriesNameIndex].map(color => color.a(panel.dataBgColorAlpha).rgba()),
-          borderColor: baseColors[seriesNameIndex].map(color => color.a(panel.dataBorderColorAlpha).rgba()),
+          borderColor: baseColors[seriesNameIndex].map(color => color.l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba()),
           borderWidth: panel.borderWidth,
           stack: panel.isStacked ? seriesStacks[seriesNameIndex] : seriesNameIndex,
           filteredRows: categories.map(category => {
@@ -978,7 +997,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
 
     // Derive the background and border colors from the base colors.
     let bgColors = baseColors.map(color => color.a(panel.dataBgColorAlpha).rgba());
-    let borderColors = baseColors.map(color => color.a(panel.dataBorderColorAlpha).rgba());
+    let borderColors = baseColors.map(color => color.l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba());
 
     let dataset = {
       label: categories,

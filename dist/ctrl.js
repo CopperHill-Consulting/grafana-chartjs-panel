@@ -77,6 +77,7 @@ var BAR_DEFAULTS = {
   isStacked: false,
   dataBgColorAlpha: 0.75,
   dataBorderColorAlpha: 1,
+  dataBorderBrightness: 0.5,
   numberFormat: 'none',
   numberFormatDecimals: 0,
   tooltip: {
@@ -122,6 +123,7 @@ var FUNNEL_DEFAULTS = {
   seriesColors: [],
   dataBgColorAlpha: 0.75,
   dataBorderColorAlpha: 1,
+  dataBorderBrightness: 0.5,
   numberFormat: 'none',
   numberFormatDecimals: 0,
   gap: 1,
@@ -138,20 +140,24 @@ var PIE_DEFAULTS = {
   pieType: 'pie',
   isSemiCircle: false,
   categoryColumnName: null,
+  seriesColumnName: null,
   measureColumnName: null,
   labelColumnName: null,
   drilldownLinks: [],
   borderWidth: 1,
+  colorBy: 'both',
   colorSource: 'auto',
   colorColumnName: null,
   seriesColors: [],
   dataBgColorAlpha: 0.75,
+  dataBorderBrightness: 0.5,
   dataBorderColorAlpha: 1,
   numberFormat: 'none',
   numberFormatDecimals: 0,
   labels: {
     isShowing: true,
-    isBlackText: false
+    isBlackText: false,
+    wrapAfter: 25
   },
   legend: {
     isShowing: true,
@@ -311,6 +317,12 @@ function (_MetricsPanelCtrl) {
       return {
         value: x / 100,
         text: "".concat(x, "%") + (x ? x === 100 ? ' (Solid)' : '' : ' (Invisible)')
+      };
+    });
+    _this.BRIGHTNESSES = _lodash.default.range(0, 101, 5).map(function (x) {
+      return {
+        value: x / 100,
+        text: "".concat(x, "%") + (x ? x === 100 ? ' (White)' : '' : ' (Black)')
       };
     });
     _this.TICK_ROTATIONS = _lodash.default.range(0, 91, 5).map(function (x) {
@@ -639,30 +651,51 @@ function (_MetricsPanelCtrl) {
           colIndexesByText = data.colIndexesByText;
       var fullPanel = ctrl.panel;
       var panel = fullPanel.pie;
-      var categoryColIndex = ctrl.getColIndex('category', panel); // let seriesColIndex = ctrl.getColIndex('series', panel);
-
+      var categoryColIndex = ctrl.getColIndex('category', panel);
+      var seriesColIndex = panel.pieType === 'polar' ? -1 : ctrl.getColIndex('series', panel, true);
       var measureColIndex = ctrl.getColIndex('measure', panel);
       var labelColIndex = ctrl.getColIndex('label', panel, true);
+      var colorColIndex = ctrl.getColIndex('color', panel, true);
+      var ignoreSeries = seriesColIndex < 0;
 
       var categories = _lodash.default.uniq(rows.map(function (row) {
         return row[categoryColIndex];
       })).reverse();
 
-      var measures = rows.reduce(function (measures, row, rowIndex) {
-        var measureIndex = categories.indexOf(row[categoryColIndex]);
-        measures[measureIndex] = (measures[measureIndex] || 0) + row[measureColIndex];
-        return measures;
-      }, []);
-      var labels = rows.reduce(function (labels, row, rowIndex) {
-        var labelIndex = categories.indexOf(row[categoryColIndex]);
-        labels[labelIndex] = labels[labelIndex] || row[labelColIndex];
-        return labels;
-      }, []);
+      var series = _lodash.default.uniq(rows.map(function (row) {
+        return row[seriesColIndex];
+      })).reverse();
+
+      var categoryCount = categories.length;
+      var seriesCount = series.length;
+      var measureCount = categoryCount * seriesCount;
+
+      var _rows$reduce = rows.reduce(function (carry, row, rowIndex) {
+        var category = row[categoryColIndex];
+        var categoryIndex = categories.indexOf(category);
+        var seriesName = row[seriesColIndex];
+        var seriesIndex = series.indexOf(seriesName);
+        var index = categoryIndex + seriesIndex * categoryCount;
+        carry.measures[index] = (carry.measures[index] || 0) + row[measureColIndex];
+        carry.labels[index] = carry.labels[index] || row[labelColIndex];
+        carry.colors[index] = carry.colors[index] || row[colorColIndex];
+        return carry;
+      }, {
+        measures: [],
+        labels: [],
+        colors: []
+      }),
+          measures = _rows$reduce.measures,
+          labels = _rows$reduce.labels,
+          colors = _rows$reduce.colors;
+
       var baseColors;
       var colorSource = panel.colorSource,
           seriesColors = panel.seriesColors,
           colorColumnName = panel.colorColumnName,
+          colorBy = panel.colorBy,
           sortOrder = panel.sortOrder;
+      var seriesColorCount = seriesColors.length;
       var isLightTheme = _config.default.theme.type === 'light';
 
       if (colorSource === 'column') {
@@ -670,51 +703,37 @@ function (_MetricsPanelCtrl) {
           throw new Error('Invalid color column.');
         }
 
-        baseColors = categories.map(function (category) {
-          return (0, _CWestColor.Color)(rows.find(function (row) {
-            return row[categoryColIndex] === category;
-          })[colIndexesByText[colorColumnName]]);
-        });
-      } else if (colorSource === 'custom') {
-        baseColors = categories.map(function (category, index, categories) {
-          return (0, _CWestColor.Color)(seriesColors[index % seriesColors.length]);
+        baseColors = colors.map(function (x) {
+          return (0, _CWestColor.Color)(x);
         });
       } else {
-        baseColors = categories.map(function (category, index, categories) {
-          return _CWestColor.Color.hsl(~~(360 * index / categories.length), 1, 0.5);
-        });
-      } // Sort the measures and then the categories accordingly.
+        baseColors = [];
 
+        if (colorSource === 'custom') {
+          if (!seriesColorCount) {
+            throw new Error('No base colors have been added.');
+          }
 
-      var altBaseColors;
-      measures = measures.map(function (value, index) {
-        return {
-          index: index,
-          value: value
-        };
-      }); //measures.sort(sortOrder === 'desc' ? (a, b) => b.value - a.value : (a, b) => a.value - b.value);
-
-      var _measures$reduce = measures.reduce(function (carry, measure, index) {
-        var _carry = _slicedToArray(carry, 3),
-            altBaseColors = _carry[0],
-            newCategories = _carry[1],
-            newMeasures = _carry[2];
-
-        altBaseColors.push(baseColors[measure.index]);
-        newCategories.push(categories[measure.index]);
-        newMeasures.push(measure.value);
-        return carry;
-      }, [[], [], []]);
-
-      var _measures$reduce2 = _slicedToArray(_measures$reduce, 3);
-
-      altBaseColors = _measures$reduce2[0];
-      categories = _measures$reduce2[1];
-      measures = _measures$reduce2[2];
-
-      // If using a column as the source of the colors make sure to order them according to the categories.
-      if (colorSource === 'column') {
-        baseColors = altBaseColors;
+          seriesColors = seriesColors.map(function (x) {
+            return (0, _CWestColor.Color)(x);
+          });
+          series.forEach(function (seriesName, seriesIndex) {
+            categories.forEach(function (category, categoryIndex) {
+              var index = categoryIndex + seriesIndex * categoryCount;
+              var colorIndex = colorBy === 'series' ? seriesIndex : colorBy === 'both' ? index : categoryIndex;
+              baseColors[index] = seriesColors[colorIndex % seriesColorCount];
+            });
+          });
+        } else {
+          series.forEach(function (seriesName, seriesIndex) {
+            categories.forEach(function (category, categoryIndex) {
+              var index = categoryIndex + seriesIndex * categoryCount;
+              var colorIndex = colorBy === 'series' ? seriesIndex : colorBy === 'both' ? index : categoryIndex;
+              var colorCount = colorBy === 'series' ? seriesCount : colorBy === 'both' ? measureCount : categoryCount;
+              baseColors[index] = _CWestColor.Color.hsl(Math.round(360 * colorIndex / colorCount), 1, 0.5);
+            });
+          });
+        }
       }
 
       function testChartEvent(e, callback) {
@@ -751,43 +770,51 @@ function (_MetricsPanelCtrl) {
         return color.a(panel.dataBgColorAlpha).rgba();
       });
       var borderColors = baseColors.map(function (color) {
-        return color.a(panel.dataBorderColorAlpha).rgba();
+        return color.l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba();
       });
-      var dataset = {
-        label: categories,
-        data: measures,
-        borderWidth: panel.borderWidth,
-        borderColor: borderColors,
-        backgroundColor: bgColors,
-        datalabels: {
-          anchor: 'center',
-          display: 'auto',
-          backgroundColor: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
-          color: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'black' : 'white').rgb(),
-          borderRadius: 5,
-          formatter: function formatter(value, _ref) {
-            var dataIndex = _ref.dataIndex,
-                datasetIndex = _ref.datasetIndex;
+      var datasets = series.map(function (seriesName, seriesIndex) {
+        return {
+          label: categories,
+          data: measures.filter(function (measure, measureIndex) {
+            return ~~(measureIndex / categoryCount) === seriesIndex;
+          }),
+          borderWidth: panel.borderWidth,
+          borderColor: borderColors.filter(function (measure, measureIndex) {
+            return ~~(measureIndex / categoryCount) === seriesIndex;
+          }),
+          backgroundColor: bgColors.filter(function (measure, measureIndex) {
+            return ~~(measureIndex / categoryCount) === seriesIndex;
+          }),
+          datalabels: {
+            anchor: 'center',
+            display: 'auto',
+            backgroundColor: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
+            color: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'black' : 'white').rgb(),
+            borderRadius: 5,
+            formatter: function formatter(value, _ref) {
+              var dataIndex = _ref.dataIndex,
+                  datasetIndex = _ref.datasetIndex;
+              var result = labels[dataIndex + datasetIndex * categoryCount];
 
-            if (labelColIndex < 0) {
-              var numberFormat = panel.numberFormat,
-                  numberFormatDecimals = panel.numberFormatDecimals;
-              var label = !['none', null, void 0].includes(numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(numberFormat)(value, numberFormatDecimals, null) : value;
-              return label;
-            }
+              if (labelColIndex < 0) {
+                var numberFormat = panel.numberFormat,
+                    numberFormatDecimals = panel.numberFormatDecimals;
+                result = !['none', null, void 0].includes(numberFormat) && 'number' === typeof value ? (0, _ui.getValueFormat)(numberFormat)(value, numberFormatDecimals, null) : value;
+              }
 
-            return labels[dataIndex];
-          },
-          textAlign: 'center'
-        }
-      };
+              return (0, _helperFunctions.wrapText)("".concat(result), panel.labels.wrapAfter);
+            },
+            textAlign: 'center'
+          }
+        };
+      });
       var chartConfig = {
         responsive: true,
         data: {
-          datasets: [dataset],
-          labels: 'string' === typeof dataset.label ? dataset.data.map(function (x, i) {
-            return "".concat(dataset.label, " #").concat(i + 1);
-          }) : dataset.label
+          datasets: datasets,
+          labels: 'string' === typeof datasets[0].label ? datasets[0].data.map(function (x, i) {
+            return "".concat(datasets[0].label, " #").concat(i + 1);
+          }) : datasets[0].label
         },
         options: {
           circumference: (panel.isSemiCircle ? 1 : 2) * Math.PI,
@@ -797,6 +824,12 @@ function (_MetricsPanelCtrl) {
           },
           tooltips: {
             callbacks: {
+              title: function title(_ref2, data) {
+                var _ref3 = _slicedToArray(_ref2, 1),
+                    tooltipItem = _ref3[0];
+
+                return series[tooltipItem.datasetIndex];
+              },
               label: function label(tooltipItem, data) {
                 var numberFormat = panel.numberFormat,
                     numberFormatDecimals = panel.numberFormatDecimals;
@@ -870,7 +903,7 @@ function (_MetricsPanelCtrl) {
         return row[categoryColIndex];
       }));
 
-      var _rows$reduce = rows.reduce(function (carry, row) {
+      var _rows$reduce2 = rows.reduce(function (carry, row) {
         var seriesName = row[seriesColIndex];
 
         if (!carry.series.includes(seriesName)) {
@@ -883,8 +916,8 @@ function (_MetricsPanelCtrl) {
         series: [],
         seriesStacks: []
       }),
-          series = _rows$reduce.series,
-          seriesStacks = _rows$reduce.seriesStacks;
+          series = _rows$reduce2.series,
+          seriesStacks = _rows$reduce2.seriesStacks;
 
       series = series.map(function (name) {
         return name === undefined ? 'Series' : name;
@@ -983,7 +1016,7 @@ function (_MetricsPanelCtrl) {
                 return color.a(panel.dataBgColorAlpha).rgba();
               }),
               borderColor: baseColors[seriesNameIndex].map(function (color) {
-                return color.a(panel.dataBorderColorAlpha).rgba();
+                return color.l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba();
               }),
               borderWidth: panel.borderWidth,
               stack: panel.isStacked ? seriesStacks[seriesNameIndex] : seriesNameIndex,
@@ -1012,9 +1045,9 @@ function (_MetricsPanelCtrl) {
           tooltips: {
             mode: 'point',
             callbacks: {
-              title: function title(_ref2, data) {
-                var _ref3 = _slicedToArray(_ref2, 1),
-                    tooltipItem = _ref3[0];
+              title: function title(_ref4, data) {
+                var _ref5 = _slicedToArray(_ref4, 1),
+                    tooltipItem = _ref5[0];
 
                 if (!ignoreSeries) {
                   var datasets = data.datasets,
@@ -1176,11 +1209,11 @@ function (_MetricsPanelCtrl) {
         return a.value - b.value;
       });
 
-      var _measures$reduce3 = measures.reduce(function (carry, measure, index) {
-        var _carry2 = _slicedToArray(carry, 3),
-            altBaseColors = _carry2[0],
-            newCategories = _carry2[1],
-            newMeasures = _carry2[2];
+      var _measures$reduce = measures.reduce(function (carry, measure, index) {
+        var _carry = _slicedToArray(carry, 3),
+            altBaseColors = _carry[0],
+            newCategories = _carry[1],
+            newMeasures = _carry[2];
 
         altBaseColors.push(baseColors[measure.index]);
         newCategories.push(categories[measure.index]);
@@ -1188,11 +1221,11 @@ function (_MetricsPanelCtrl) {
         return carry;
       }, [[], [], []]);
 
-      var _measures$reduce4 = _slicedToArray(_measures$reduce3, 3);
+      var _measures$reduce2 = _slicedToArray(_measures$reduce, 3);
 
-      altBaseColors = _measures$reduce4[0];
-      categories = _measures$reduce4[1];
-      measures = _measures$reduce4[2];
+      altBaseColors = _measures$reduce2[0];
+      categories = _measures$reduce2[1];
+      measures = _measures$reduce2[2];
 
       // If using a column as the source of the colors make sure to order them according to the categories.
       if (colorSource === 'column') {
@@ -1233,7 +1266,7 @@ function (_MetricsPanelCtrl) {
         return color.a(panel.dataBgColorAlpha).rgba();
       });
       var borderColors = baseColors.map(function (color) {
-        return color.a(panel.dataBorderColorAlpha).rgba();
+        return color.l(panel.dataBorderBrightness).a(panel.dataBorderColorAlpha).rgba();
       });
       var dataset = {
         label: categories,
