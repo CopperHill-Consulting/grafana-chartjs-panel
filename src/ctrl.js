@@ -1077,15 +1077,16 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   }
 
   openDrilldownLink(drilldownLink, matchingRows) {
-    let { data: { colIndexesByText }, templateSrv: { variables }, timeSrv: { time: timeVars } } = this;
+    let { data: { colIndexesByText }, templateSrv: { variables }, timeSrv } = this;
     let { url, openInBlank } = drilldownLink;
     url = url.replace(RGX_OLD_VAR_WORKAROUND, '$1$2').replace(
       RGX_CELL_PLACEHOLDER,
       function (match, isTime, opt_timePart, type, name, isRaw, isParam, paramName) {
         if (isTime) {
-          return (opt_timePart != 'to' ? 'from=' + encodeURIComponent(timeVars.from) : '')
+          let { from, to } = timeSrv.timeRangeForUrl();
+          return (opt_timePart != 'to' ? 'from=' + encodeURIComponent(from) : '')
             + (opt_timePart ? '' : '&')
-            + (opt_timePart != 'from' ? 'to=' + encodeURIComponent(timeVars.to) : '');
+            + (opt_timePart != 'from' ? 'to=' + encodeURIComponent(to) : '');
         }
 
         name = name && name.replace(/\\(.)/g, '$1');

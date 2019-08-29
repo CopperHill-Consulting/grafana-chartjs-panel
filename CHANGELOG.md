@@ -1,5 +1,8 @@
 # Changelog
 
+- **v3.0.1**
+  - Fixed `${time}`, `${time-from}` and `${time-to}` so that if they contain custom dates the dates will display correctly in the URL.
+
 - **v3.0.0**
   - Added custom tooltips to all chart types.
   - Added count types for all chart types.  The default is `sum` but other options are available.

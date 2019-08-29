@@ -1299,12 +1299,16 @@ function (_MetricsPanelCtrl) {
     value: function openDrilldownLink(drilldownLink, matchingRows) {
       var colIndexesByText = this.data.colIndexesByText,
           variables = this.templateSrv.variables,
-          timeVars = this.timeSrv.time;
+          timeSrv = this.timeSrv;
       var url = drilldownLink.url,
           openInBlank = drilldownLink.openInBlank;
       url = url.replace(RGX_OLD_VAR_WORKAROUND, '$1$2').replace(RGX_CELL_PLACEHOLDER, function (match, isTime, opt_timePart, type, name, isRaw, isParam, paramName) {
         if (isTime) {
-          return (opt_timePart != 'to' ? 'from=' + encodeURIComponent(timeVars.from) : '') + (opt_timePart ? '' : '&') + (opt_timePart != 'from' ? 'to=' + encodeURIComponent(timeVars.to) : '');
+          var _timeSrv$timeRangeFor = timeSrv.timeRangeForUrl(),
+              from = _timeSrv$timeRangeFor.from,
+              to = _timeSrv$timeRangeFor.to;
+
+          return (opt_timePart != 'to' ? 'from=' + encodeURIComponent(from) : '') + (opt_timePart ? '' : '&') + (opt_timePart != 'from' ? 'to=' + encodeURIComponent(to) : '');
         }
 
         name = name && name.replace(/\\(.)/g, '$1');
