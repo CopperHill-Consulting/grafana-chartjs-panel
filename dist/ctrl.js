@@ -203,6 +203,7 @@ var OPTIONS_BY_TYPE = {
   pie: Object.keys(_YourJS.default.flattenKeys(PIE_DEFAULTS, true)),
   funnel: Object.keys(_YourJS.default.flattenKeys(FUNNEL_DEFAULTS, true))
 };
+var DISABLE_ANIMATIONS = !/^(0|[Ff]alse|[Oo]ff|[Nn]o|)$/.test([_YourJS.default.parseQS(location.href).__noanimation] + '');
 
 var ChartJsPanelCtrl =
 /*#__PURE__*/
@@ -1060,6 +1061,10 @@ function (_MetricsPanelCtrl) {
         }
       };
 
+      if (DISABLE_ANIMATIONS) {
+        chartConfig.options.animation = false;
+      }
+
       if (panel.labels.isShowing) {
         chartConfig.plugins = [ChartDataLabels];
       }
@@ -1200,6 +1205,10 @@ function (_MetricsPanelCtrl) {
         }
       };
 
+      if (DISABLE_ANIMATIONS) {
+        chartConfig.options.animation = false;
+      }
+
       if (panel.labels.isShowing) {
         chartConfig.plugins = [ChartDataLabels];
       }
@@ -1288,9 +1297,14 @@ function (_MetricsPanelCtrl) {
             }
           }
         }
-      }; // if (panel.labels.isShowing) {
+      };
+
+      if (DISABLE_ANIMATIONS) {
+        chartConfig.options.animation = false;
+      } // if (panel.labels.isShowing) {
       //   chartConfig.plugins = [ChartDataLabels];
       // }
+
 
       var myChart = new Chart(canvas.getContext('2d'), chartConfig);
     }

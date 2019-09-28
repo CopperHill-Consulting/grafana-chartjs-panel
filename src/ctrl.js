@@ -167,6 +167,8 @@ const OPTIONS_BY_TYPE = {
   funnel: Object.keys(JS.flattenKeys(FUNNEL_DEFAULTS, true))
 };
 
+const DISABLE_ANIMATIONS = !/^(0|[Ff]alse|[Oo]ff|[Nn]o|)$/.test([JS.parseQS(location.href).__noanimation] + '');
+
 export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   constructor($scope, $injector, $rootScope) {
     super($scope, $injector);
@@ -836,6 +838,10 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       }
     };
 
+    if (DISABLE_ANIMATIONS) {
+      chartConfig.options.animation = false;
+    }
+
     if (panel.labels.isShowing) {
       chartConfig.plugins = [ChartDataLabels];
     }
@@ -978,6 +984,10 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
       }
     };
 
+    if (DISABLE_ANIMATIONS) {
+      chartConfig.options.animation = false;
+    }
+
     if (panel.labels.isShowing) {
       chartConfig.plugins = [ChartDataLabels];
     }
@@ -1068,6 +1078,10 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         }
       }
     };
+
+    if (DISABLE_ANIMATIONS) {
+      chartConfig.options.animation = false;
+    }
 
     // if (panel.labels.isShowing) {
     //   chartConfig.plugins = [ChartDataLabels];
