@@ -200,9 +200,6 @@
       />
     </div>
     <div class="gf-form">
-      <gf-form-switch class="gf-form" label="Black On White" label-class="width-auto" checked="ctrl.getChartPanel().labels.isBlackText" on-change="ctrl.renderNow()"></gf-form-switch>
-    </div>
-    <div class="gf-form">
       <label class="gf-form-label width-auto">Wrap After</label>
       <input type="number"
         class="gf-form-input width-4"
@@ -212,6 +209,12 @@
         ng-model="ctrl.getChartPanel().labels.wrapAfter"
         ng-change="ctrl.renderNow()"
       />
+    </div>
+    <div class="gf-form">
+      <gf-form-switch class="gf-form" label="Black On White" label-class="width-auto" checked="ctrl.getChartPanel().labels.isBlackText" on-change="ctrl.renderNow()"></gf-form-switch>
+    </div>
+    <div class="gf-form">
+      <gf-form-switch class="gf-form" label="Prevent Overlap" label-class="width-auto" checked="ctrl.getChartPanel().labels.preventOverlap" on-change="ctrl.renderNow()"></gf-form-switch>
     </div>
   </div>
 </div>

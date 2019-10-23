@@ -98,7 +98,8 @@ var BAR_DEFAULTS = {
     isShowing: false,
     format: '${measure}',
     isBlackText: IS_LIGHT_THEME,
-    wrapAfter: 25
+    wrapAfter: 25,
+    preventOverlap: true
   },
   legend: {
     isShowing: true,
@@ -189,7 +190,8 @@ var PIE_DEFAULTS = {
     isShowing: false,
     format: '${measure}',
     isBlackText: IS_LIGHT_THEME,
-    wrapAfter: 25
+    wrapAfter: 25,
+    preventOverlap: true
   },
   legend: {
     isShowing: true,
@@ -1007,7 +1009,7 @@ function (_MetricsPanelCtrl) {
           backgroundColor: bgColors.filter(fnFilter),
           datalabels: {
             anchor: 'center',
-            display: 'auto',
+            display: panel.labels.preventOverlap ? 'auto' : true,
             backgroundColor: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
             color: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'black' : 'white').rgb(),
             borderRadius: 5,
@@ -1119,7 +1121,7 @@ function (_MetricsPanelCtrl) {
           stack: panel.isStacked ? seriesStacks[seriesIndex] : seriesIndex,
           datalabels: {
             anchor: 'center',
-            display: 'auto',
+            display: panel.labels.preventOverlap ? 'auto' : true,
             backgroundColor: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
             color: (0, _CWestColor.Color)(panel.labels.isBlackText ? 'black' : 'white').rgb(),
             borderRadius: 5,

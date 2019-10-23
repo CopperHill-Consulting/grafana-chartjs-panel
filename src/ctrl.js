@@ -58,7 +58,8 @@ const BAR_DEFAULTS = {
     isShowing: false,
     format: '${measure}',
     isBlackText: IS_LIGHT_THEME,
-    wrapAfter: 25
+    wrapAfter: 25,
+    preventOverlap: true
   },
   legend: {
     isShowing: true,
@@ -151,7 +152,8 @@ const PIE_DEFAULTS = {
     isShowing: false,
     format: '${measure}',
     isBlackText: IS_LIGHT_THEME,
-    wrapAfter: 25
+    wrapAfter: 25,
+    preventOverlap: true
   },
   legend: {
     isShowing: true,
@@ -785,7 +787,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         backgroundColor: bgColors.filter(fnFilter),
         datalabels: {
           anchor: 'center',
-          display: 'auto',
+          display: panel.labels.preventOverlap ? 'auto' : true,
           backgroundColor: Color(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
           color: Color(panel.labels.isBlackText ? 'black' : 'white').rgb(),
           borderRadius: 5,
@@ -891,7 +893,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         stack: panel.isStacked ? seriesStacks[seriesIndex] : seriesIndex,
         datalabels: {
           anchor: 'center',
-          display: 'auto',
+          display: panel.labels.preventOverlap ? 'auto' : true,
           backgroundColor: Color(panel.labels.isBlackText ? 'white' : 'black').a(0.75).rgba(),
           color: Color(panel.labels.isBlackText ? 'black' : 'white').rgb(),
           borderRadius: 5,

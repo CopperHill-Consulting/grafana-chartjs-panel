@@ -1,5 +1,8 @@
 # Changelog
 
+- **v3.1.0**
+  - Added an option to allow or prevent data label overlapping.
+
 - **v3.0.1**
   - Fixed `${time}`, `${time-from}` and `${time-to}` so that if they contain custom dates the dates will display correctly in the URL.
 
