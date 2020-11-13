@@ -1,0 +1,318 @@
+<div class="section gf-form-group">
+  <h5>Chart Properties</h5>
+  <div class="gf-form">
+    <span class="gf-form-label width-auto">Chart Type</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.panel.chartType"
+        ng-options="ct.value as ct.text for ct in ctrl.CHART_TYPES"
+        ng-change="ctrl.setPanelDefaults() + ctrl.renderNow()"></select>
+    </div>
+  </div>
+
+  <div ng-if="ctrl.isActiveOption('pieType')" class="gf-form">
+    <span class="gf-form-label width-auto">Pie Type</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().pieType"
+        ng-options="ct.value as ct.text for ct in ctrl.PIE_TYPES"
+        ng-change="ctrl.setPanelDefaults() + ctrl.renderNow()"></select>
+    </div>
+  </div>
+
+  <div ng-if="ctrl.isActiveOption('countType')" class="gf-form">
+    <span class="gf-form-label width-auto">Count Type</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().countType"
+        ng-options="ct.value as ct.text for ct in ctrl.COUNT_TYPES"
+        ng-change="ctrl.setPanelDefaults() + ctrl.renderNow()"></select>
+    </div>
+  </div>
+
+  <div ng-if="ctrl.isActiveOption('isSemiCircle') && ctrl.getChartPanel().pieType !== 'polar'" class="gf-form">
+    <gf-form-switch class="gf-form" label="Show As Semi-circle" label-class="width-auto" checked="ctrl.getChartPanel().isSemiCircle" on-change="ctrl.renderNow()"></gf-form-switch>
+  </div>
+
+  <div ng-if="ctrl.isActiveOption('hAlign')" class="gf-form">
+    <span class="gf-form-label width-auto">Alignment</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().hAlign"
+        ng-options="ct.value as ct.text for ct in ctrl.CHART_H_ALIGNMENTS"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.isActiveOption('orientation')" class="gf-form">
+    <span class="gf-form-label width-auto">Orientation</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().orientation"
+        ng-options="ct.value as ct.text for ct in ctrl.CHART_ORIENTATIONS"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.isActiveOption('sortOrder')" class="gf-form">
+    <span class="gf-form-label width-auto">Sort Order</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().sortOrder"
+        ng-options="ct.value as ct.text for ct in ctrl.SORT_ORDERS"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.isActiveOption('startWidthPct')" class="gf-form">
+    <span class="gf-form-label width-auto">Minimum Width</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().startWidthPct"
+        ng-options="ct.value as ct.text for ct in ctrl.CHART_START_WIDTH_PERCENTAGES"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.isActiveOption('gap')" class="gf-form">
+    <span class="gf-form-label width-auto">Gap Size</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().gap"
+        ng-options="ct.value as ct.text for ct in ctrl.CHART_GAP_SIZES"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.isActiveOption('borderWidth')" class="gf-form">
+    <span class="gf-form-label width-auto">Border Width</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().borderWidth"
+        ng-options="ct.value as ct.text for ct in ctrl.CHART_BORDER_WIDTHS"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.isActiveOption('numberFormat')">
+    <div class="gf-form">
+      <label class="gf-form-label width-auto">Number Format</label>
+      <div class="gf-form-dropdown-typeahead width-auto"
+        ng-model="ctrl.getChartPanel().numberFormat"
+        dropdown-typeahead2="ctrl.UNIT_FORMATS"
+        dropdown-typeahead-on-select="ctrl.setActiveOption('numberFormat', $subItem.value)">
+      </div>
+    </div>
+    <div ng-if="ctrl.getChartPanel().numberFormat != 'none' &amp;&amp; ctrl.isActiveOption('numberFormatDecimals')" class="gf-form">
+      <label class="gf-form-label width-auto">Decimals</label>
+      <input type="number"
+        class="gf-form-input width-4"
+        data-placement="right"
+        ng-model="ctrl.getChartPanel().numberFormatDecimals"
+        ng-change="ctrl.renderNow()"
+      />
+    </div>
+  </div>
+</div>
+<div class="section gf-form-group">
+  <h5>Column Definitions</h5>
+  <div ng-if="ctrl.isActiveOption('isStacked')" class="gf-form">
+    <gf-form-switch class="gf-form" label="Is Stacked" label-class="width-auto" checked="ctrl.getChartPanel().isStacked" on-change="ctrl.renderNow()"></gf-form-switch>
+  </div>
+  <div ng-if="ctrl.isActiveOption('categoryColumnName')" class="gf-form">
+    <span class="gf-form-label width-auto">Category Column</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().categoryColumnName"
+        ng-options="ct for ct in ctrl.data.columnTexts"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.isActiveOption('seriesColumnName') && !(ctrl.isActiveOption('pieType') && ctrl.getChartPanel().pieType === 'polar')" class="gf-form">
+    <span class="gf-form-label width-auto">Series Column</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().seriesColumnName"
+        ng-options="ct as (ct === null ? '--- NONE ---' : ct) for ct in [null].concat(ctrl.data.columnTexts)"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div class="gf-form" ng-if="ctrl.isActiveOption('stackColumnName') &amp;&amp; ctrl.getChartPanel().isStacked">
+    <span class="gf-form-label width-auto">Stack Column</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().stackColumnName"
+        ng-options="ct as (ct === null ? '--- NONE ---' : ct) for ct in [null].concat(ctrl.data.columnTexts)"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.isActiveOption('measureColumnName')" class="gf-form">
+    <span class="gf-form-label width-auto">Measure Column</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().measureColumnName"
+        ng-options="ct for ct in ctrl.data.columnTexts"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+</div>
+<div class="section gf-form-group">
+  <h5>Legend</h5>
+  <div ng-if="ctrl.isActiveOption('legend.isShowing')" class="gf-form">
+    <gf-form-switch class="gf-form" label="Is Showing" label-class="width-auto" checked="ctrl.getChartPanel().legend.isShowing" on-change="ctrl.renderNow()"></gf-form-switch>
+  </div>
+  <div ng-if="ctrl.getChartPanel().legend.isShowing">
+    <div ng-if="ctrl.isActiveOption('legend.isFullWidth')" class="gf-form">
+      <gf-form-switch class="gf-form" label="Is Full Width" label-class="width-auto" checked="ctrl.getChartPanel().legend.isFullWidth" on-change="ctrl.renderNow()"></gf-form-switch>
+    </div>
+    <div ng-if="ctrl.isActiveOption('legend.isReverse')" class="gf-form">
+      <gf-form-switch class="gf-form" label="Reverse" label-class="width-auto" checked="ctrl.getChartPanel().legend.isReverse" on-change="ctrl.renderNow()"></gf-form-switch>
+    </div>
+    <div ng-if="ctrl.isActiveOption('legend.position')" class="gf-form">
+      <span class="gf-form-label width-auto">Position</span>
+      <div class="gf-form-select-wrapper width-auto">
+        <select class="gf-form-input"
+          ng-model="ctrl.getChartPanel().legend.position"
+          ng-options="t for t in ['top', 'left', 'right', 'bottom']"
+          ng-change="ctrl.renderNow()">
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="section gf-form-group" ng-if="ctrl.isActiveOption('labels.isShowing')">
+  <h5>Labels</h5>
+  <div ng-if="ctrl.isActiveOption('labels.isShowing')" class="gf-form">
+    <gf-form-switch class="gf-form" label="Is Showing" label-class="width-auto" checked="ctrl.getChartPanel().labels.isShowing" on-change="ctrl.renderNow()"></gf-form-switch>
+  </div>
+  <div ng-if="ctrl.getChartPanel().labels.isShowing">
+    <div class="gf-form">
+      <label class="gf-form-label width-auto">Format</label>
+      <input type="text"
+        class="gf-form-input width-max"
+        ng-model="ctrl.getChartPanel().labels.format"
+        placeholder="eg. ${category}: ${measure}"
+        ng-blur="ctrl.renderNow()"
+      />
+    </div>
+    <div class="gf-form">
+      <label class="gf-form-label width-auto">Wrap After</label>
+      <input type="number"
+        class="gf-form-input width-4"
+        min="1"
+        max="80"
+        data-placement="right"
+        ng-model="ctrl.getChartPanel().labels.wrapAfter"
+        ng-change="ctrl.renderNow()"
+      />
+    </div>
+    <div class="gf-form">
+      <gf-form-switch class="gf-form" label="Black On White" label-class="width-auto" checked="ctrl.getChartPanel().labels.isBlackText" on-change="ctrl.renderNow()"></gf-form-switch>
+    </div>
+    <div class="gf-form">
+      <gf-form-switch class="gf-form" label="Prevent Overlap" label-class="width-auto" checked="ctrl.getChartPanel().labels.preventOverlap" on-change="ctrl.renderNow()"></gf-form-switch>
+    </div>
+  </div>
+</div>
+<div class="section gf-form-group" ng-if="ctrl.isActiveOption('tooltip.isCustom')">
+  <h5>Tooltips</h5>
+  <div class="gf-form">
+    <gf-form-switch class="gf-form" label="Is Custom" label-class="width-auto" checked="ctrl.getChartPanel().tooltip.isCustom" on-change="ctrl.renderNow()"></gf-form-switch>
+  </div>
+  <div ng-if="ctrl.getChartPanel().tooltip.isCustom">
+    <div class="gf-form">
+      <label class="gf-form-label width-auto">Title Format</label>
+      <input type="text"
+        class="gf-form-input width-max"
+        ng-model="ctrl.getChartPanel().tooltip.titleFormat"
+        placeholder="eg. ${category}"
+        ng-blur="ctrl.renderNow()"
+      />
+    </div>
+    <div class="gf-form">
+      <label class="gf-form-label width-auto">Label Format</label>
+      <input type="text"
+        class="gf-form-input width-max"
+        ng-model="ctrl.getChartPanel().tooltip.labelFormat"
+        placeholder="eg. ${series}: ${measure}"
+        ng-blur="ctrl.renderNow()"
+      />
+    </div>
+  </div>
+</div>
+<div ng-if="ctrl.isActiveOption('scales.xAxes')" class="section gf-form-group">
+  <h5>X-Axis</h5>
+  <div ng-if="ctrl.isActiveOption('scales.xAxes.ticks.autoSkip')" class="gf-form">
+    <gf-form-switch class="gf-form" label="Auto Skip Labels" label-class="width-auto" checked="ctrl.getChartPanel().scales.xAxes.ticks.autoSkip" on-change="ctrl.renderNow()"></gf-form-switch>
+  </div>
+  <div ng-if="ctrl.isActiveOption('scales.xAxes.ticks.minRotation')" class="gf-form">
+    <span class="gf-form-label width-auto">Minimum Rotation</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().scales.xAxes.ticks.minRotation"
+        ng-options="r.value as r.text for r in ctrl.TICK_ROTATIONS"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.isActiveOption('scales.xAxes.ticks.maxRotation')" class="gf-form">
+    <span class="gf-form-label width-auto">Maximum Rotation</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().scales.xAxes.ticks.maxRotation"
+        ng-options="r.value as r.text for r in ctrl.TICK_ROTATIONS"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.isActiveOption('scales.xAxes.gridLineOpacity')" class="gf-form">
+    <span class="gf-form-label width-auto">Gridline Style</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().scales.xAxes.gridLineOpacity"
+        ng-options="r.value as r.text for r in ctrl.GRID_LINE_OPACITIES"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+</div>
+<div ng-if="ctrl.isActiveOption('scales.yAxes')" class="section gf-form-group">
+  <h5>Y-Axis</h5>
+  <div ng-if="ctrl.isActiveOption('scales.yAxes.ticks.autoSkip')" class="gf-form">
+    <gf-form-switch class="gf-form" label="Auto Skip Labels" label-class="width-auto" checked="ctrl.getChartPanel().scales.yAxes.ticks.autoSkip" on-change="ctrl.renderNow()"></gf-form-switch>
+  </div>
+  <div ng-if="ctrl.isActiveOption('scales.yAxes.ticks.minRotation')" class="gf-form">
+    <span class="gf-form-label width-auto">Minimum Rotation</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().scales.yAxes.ticks.minRotation"
+        ng-options="r.value as r.text for r in ctrl.TICK_ROTATIONS"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.isActiveOption('scales.yAxes.ticks.maxRotation')" class="gf-form">
+    <span class="gf-form-label width-auto">Maximum Rotation</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().scales.yAxes.ticks.maxRotation"
+        ng-options="r.value as r.text for r in ctrl.TICK_ROTATIONS"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.isActiveOption('scales.yAxes.gridLineOpacity')" class="gf-form">
+    <span class="gf-form-label width-auto">Gridline Style</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().scales.yAxes.gridLineOpacity"
+        ng-options="r.value as r.text for r in ctrl.GRID_LINE_OPACITIES"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+</div>

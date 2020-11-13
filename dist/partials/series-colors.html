@@ -1,0 +1,93 @@
+<div ng-if="ctrl.isActiveOption('colorSource')" class="edit-tab-content">
+  <div class="gf-form" ng-if="ctrl.isActiveOption('colorSource')">
+    <span class="gf-form-label width-auto">Color Source</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().colorSource"
+        ng-options="ca.value as ca.text for ca in ctrl.CHART_COLOR_SOURCES"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div class="gf-form" ng-if="ctrl.isActiveOption('colorBy') &amp;&amp; ctrl.getChartPanel().colorSource !== 'column'">
+    <span class="gf-form-label width-auto">Color By</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().colorBy"
+        ng-options="cb.value as cb.text for cb in ctrl.CHART_COLOR_BY"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div class="gf-form" ng-if="ctrl.isActiveOption('colorColumnName') &amp;&amp; ctrl.getChartPanel().colorSource === 'column'">
+    <span class="gf-form-label width-auto">Color Column</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().colorColumnName"
+        ng-options="ct as (ct === null ? '--- NONE ---' : ct) for ct in [null].concat(ctrl.data.columnTexts)"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+</div>
+
+<div ng-if="ctrl.isActiveOption('seriesColors') &amp;&amp; ctrl.getChartPanel().colorSource === 'custom'" class="edit-tab-content">
+  <h5 style="margin-top: 1em;">Base Colors</h5>
+  <div class="gf-form" ng-repeat="(index, color) in ctrl.getChartPanel().seriesColors track by index">
+    <span class="gf-form-label">
+      <color-picker
+        color="color"
+        onChange="ctrl.onChangeCallback(ctrl.getChartPanel().seriesColors, index)">
+      </color-picker>
+    </span>
+    <button class="btn btn-secondary" ng-if="index != 0" ng-click="ctrl.moveSeriesColor(index, index - 1)">
+      <i class="fa fa-arrow-up"></i>
+    </button>
+    <button class="btn btn-secondary" ng-if="index + 1 != ctrl.getChartPanel().seriesColors.length" ng-click="ctrl.moveSeriesColor(index, index + 1)">
+      <i class="fa fa-arrow-down"></i>
+    </button>
+    <button class="btn btn-danger" ng-click="ctrl.removeSeriesColor(index)">
+      <i class="fa fa-trash"></i>
+    </button>
+  </div>
+  <div>
+    <button class="btn btn-success" ng-click="ctrl.addSeriesColor()">
+      <i class="fa fa-plus-circle"></i>
+      Add A Color
+    </button>
+  </div>
+</div>
+
+<div class="edit-tab-content">
+  <h5 style="margin-top: 1em;">Visibility of Dataset Colors</h5>
+  <div ng-if="ctrl.isActiveOption('dataBgColorAlpha')" class="gf-form">
+    <span class="gf-form-label width-auto">Data Background Alpha</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().dataBgColorAlpha"
+        ng-options="ca.value as ca.text for ca in ctrl.COLOR_ALPHAS"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.getChartPanel().borderWidth &gt; 0 &amp;&amp; ctrl.isActiveOption('dataBorderColorAlpha')" class="gf-form">
+    <span class="gf-form-label width-auto">Data Border Alpha</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().dataBorderColorAlpha"
+        ng-options="ca.value as ca.text for ca in ctrl.COLOR_ALPHAS"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+  <div ng-if="ctrl.getChartPanel().borderWidth &gt; 0 &amp;&amp; ctrl.getChartPanel().dataBorderColorAlpha > 0 &amp;&amp; ctrl.isActiveOption('dataBorderBrightness')" class="gf-form">
+    <span class="gf-form-label width-auto">Data Border Brightness</span>
+    <div class="gf-form-select-wrapper width-auto">
+      <select class="gf-form-input"
+        ng-model="ctrl.getChartPanel().dataBorderBrightness"
+        ng-options="ca.value as ca.text for ca in ctrl.BRIGHTNESSES"
+        ng-change="ctrl.renderNow()">
+      </select>
+    </div>
+  </div>
+</div>
