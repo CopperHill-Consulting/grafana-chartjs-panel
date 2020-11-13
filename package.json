@@ -1,7 +1,7 @@
 {
   "name": "westc-chartjs-panel",
   "private": true,
-  "version": "3.1.0",
+  "version": "4.0.0",
   "description": "",
   "repository": {
     "type": "git",
@@ -9,23 +9,26 @@
   },
   "author": "Chris West",
   "license": "MIT",
+  "scripts": {
+    "build": "grafana-toolkit plugin:build",
+    "test": "grafana-toolkit plugin:test",
+    "dev": "grafana-toolkit plugin:dev",
+    "watch": "grafana-toolkit plugin:dev --watch"
+  },
   "devDependencies": {
-    "grunt": "^0.4.5",
-    "grunt-babel": "^8.0.0",
-    "grunt-contrib-clean": "~0.6.0",
-    "grunt-contrib-copy": "~0.8.2",
-    "grunt-contrib-uglify": "~0.11.0",
-    "grunt-contrib-watch": "^0.6.1",
-    "grunt-es6-module-transpiler": "^0.6.0",
-    "grunt-execute": "~0.2.2",
-    "grunt-systemjs-builder": "^0.2.7",
-    "load-grunt-tasks": "~3.2.0"
+    "@grafana/data": "next",
+    "@grafana/ui": "next",
+    "@grafana/toolkit": "next",
+    "@types/grafana": "github:CorpGlory/types-grafana.git"
+  },
+  "resolutions": {
+    "@babel/preset-env": "7.9.0"
+  },
+  "engines": {
+    "node": ">=12 <13"
   },
   "dependencies": {
-    "@babel/cli": "^7.2.3",
-    "@babel/core": "^7.3.4",
-    "@babel/preset-env": "^7.3.4",
-    "lodash": ">=4.17.5",
-    "yarn": "^1.10.1"
+    "@babel/preset-env": "^7.12.1",
+    "babel-loader": "^8.2.1"
   }
 }

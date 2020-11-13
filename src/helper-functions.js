@@ -37,4 +37,4 @@ function wrapText(str, opt_max) {
   }, []).join('\r\n');
 }
 
-module.exports = { dateTime, parseRegExp, wrapText };
+export { dateTime, parseRegExp, wrapText };

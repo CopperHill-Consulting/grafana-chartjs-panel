@@ -1,5 +1,8 @@
 # Changelog
 
+- **v4.0.0**
+  - Upgraded to make it work in version 7.2.1 of Grafana.
+
 - **v3.1.0**
   - Added an option to allow or prevent data label overlapping.
 

@@ -17,12 +17,13 @@
     "links": [
       {"name": "Project site", "url": "https://github.com/CopperHill-Consulting/grafana-chartjs-panel.git"}
     ],
-    "version": "3.1.0",
-    "updated": "2019-10-23"
+    "screenshots": [],
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
   },
 
   "dependencies": {
-    "grafanaVersion": "6.x.x",
+    "grafanaVersion": "6.3.x",
     "plugins": [ ]
   }
 }
