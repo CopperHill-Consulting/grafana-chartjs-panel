@@ -1,5 +1,9 @@
 # Changelog
 
+- **v4.0.1**
+  - Now including `dist/` directory again.
+  - Populate `dist/` directory with production code.
+
 - **v4.0.0**
   - Upgraded to make it work in version 7.2.1 of Grafana.
 
