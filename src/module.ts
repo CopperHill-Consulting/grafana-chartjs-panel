@@ -8,11 +8,11 @@ import * as Chart from "./external/Chart.bundle.min";
 import * as ChartDataLabels from "./external/Chart.datalabels.plugin";
 import "./external/Chart.funnel";
 import { Color } from "./external/CWest-Color.min";
-import { PanelEvents } from '@grafana/data';
+import { PanelEvents } from "@grafana/data";
 
 import { parseRegExp, wrapText } from "./helper-functions";
 
-const RENDER_NOW_EVENT = {name: "renderNow"};
+const RENDER_NOW_EVENT = { name: "renderNow" };
 
 const IS_LIGHT_THEME = config.theme.type === "light";
 
@@ -276,9 +276,15 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
 
     this.setPanelDefaults();
 
-    this.events.on(PanelEvents.editModeInitialized, this.onInitEditMode.bind(this));
+    this.events.on(
+      PanelEvents.editModeInitialized,
+      this.onInitEditMode.bind(this)
+    );
     this.events.on(PanelEvents.dataReceived, this.onDataReceived.bind(this));
-    this.events.on(PanelEvents.dataSnapshotLoad, this.onDataReceived.bind(this));
+    this.events.on(
+      PanelEvents.dataSnapshotLoad,
+      this.onDataReceived.bind(this)
+    );
     this.events.on(PanelEvents.dataError, this.onDataError.bind(this));
   }
 
@@ -456,7 +462,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         .css("position", "relative")
         .html(""),
       elemContent = jContent[0],
-      canvas = JS.dom({_: 'canvas'}),
+      canvas = JS.dom({ _: "canvas" }),
       jCanvas = jQuery(canvas).appendTo(jContent);
 
     if (data && data.rows && data.rows.length) {
@@ -1332,8 +1338,10 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   }
 
   link(scope, elem, attrs, ctrl) {
-    let panelElement = elem.find('grafana-panel > *:eq(0)');
-    this.events.on(RENDER_NOW_EVENT, e => this.drawChart.call(this, e, panelElement));
+    let panelElement = elem.find("grafana-panel > *:eq(0)");
+    this.events.on(RENDER_NOW_EVENT, e =>
+      this.drawChart.call(this, e, panelElement)
+    );
     this.events.on(
       PanelEvents.render,
       _.debounce(e => this.drawChart.call(this, e, panelElement), 250)
