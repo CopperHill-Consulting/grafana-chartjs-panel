@@ -269,6 +269,8 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   constructor($scope, $injector, $rootScope) {
     super($scope, $injector);
 
+    console.log("constructor():", { $scope, $injector, $rootScope });
+
     this.$rootScope = $rootScope;
     this.data = null;
 
@@ -1191,6 +1193,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   }
 
   link(scope, elem, attrs, ctrl) {
+    console.log("link():", { scope, elem, attrs, ctrl });
     let panelElement = elem.find("grafana-panel > *:eq(0)");
     this.events.on(RENDER_NOW_EVENT, e => this.drawChart.call(this, e, panelElement));
     this.events.on(

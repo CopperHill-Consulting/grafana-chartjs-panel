@@ -1,5 +1,8 @@
 # Changelog
 
+- **v4.0.2**
+  - Minor change to try to get this working on AWS.
+
 - **v4.0.1**
   - Now including `dist/` directory again.
   - Populate `dist/` directory with production code.
