@@ -1,5 +1,8 @@
 # Changelog
 
+- **v4.0.3**
+  - Fix format values so they no longer show up as `[object Object]`.
+
 - **v4.0.2**
   - Minor change to try to get this working on AWS.
 

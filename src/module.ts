@@ -269,7 +269,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   constructor($scope, $injector, $rootScope) {
     super($scope, $injector);
 
-    console.log("constructor():", { $scope, $injector, $rootScope });
+    // console.log("constructor():", { $scope, $injector, $rootScope });
 
     this.$rootScope = $rootScope;
     this.data = null;
@@ -679,7 +679,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
         let { isCustom, titleFormat, labelFormat } = panel.tooltip;
         let strMeasure =
           !["none", null, void 0].includes(numberFormat) && "number" === typeof measure
-            ? getValueFormat(numberFormat)(measure, numberFormatDecimals, null)
+            ? getValueFormat(numberFormat)(measure, numberFormatDecimals, null).text
             : measure;
         let strFormat =
           (isForTooltip ? isCustom && (isForTitle ? titleFormat : labelFormat) : labelOptions.format) || defaultFormat;
@@ -978,7 +978,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
                 userCallback: function(value, index, values) {
                   let { numberFormat, numberFormatDecimals } = panel;
                   return !["none", null, void 0].includes(numberFormat) && "number" === typeof value
-                    ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
+                    ? getValueFormat(numberFormat)(value, numberFormatDecimals, null).text
                     : value;
                 },
               },
@@ -1001,7 +1001,7 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
                 userCallback: function(value, index, values) {
                   let { numberFormat, numberFormatDecimals } = panel;
                   return !["none", null, void 0].includes(numberFormat) && "number" === typeof value
-                    ? getValueFormat(numberFormat)(value, numberFormatDecimals, null)
+                    ? getValueFormat(numberFormat)(value, numberFormatDecimals, null).text
                     : value;
                 },
               },
@@ -1193,7 +1193,8 @@ export class ChartJsPanelCtrl extends MetricsPanelCtrl {
   }
 
   link(scope, elem, attrs, ctrl) {
-    console.log("link():", { scope, elem, attrs, ctrl });
+    // console.log("link():", { scope, elem, attrs, ctrl });
+
     let panelElement = elem.find("grafana-panel > *:eq(0)");
     this.events.on(RENDER_NOW_EVENT, e => this.drawChart.call(this, e, panelElement));
     this.events.on(

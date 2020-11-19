@@ -12071,12 +12071,8 @@ function (_super) {
         value: x,
         text: x + "\xB0" + (x ? x === 90 ? " (Vertical)" : "" : " (Horizontal)")
       };
-    });
-    console.log("constructor():", {
-      $scope: $scope,
-      $injector: $injector,
-      $rootScope: $rootScope
-    });
+    }); // console.log("constructor():", { $scope, $injector, $rootScope });
+
     _this.$rootScope = $rootScope;
     _this.data = null;
 
@@ -12565,7 +12561,7 @@ function (_super) {
             isCustom = _a.isCustom,
             titleFormat = _a.titleFormat,
             labelFormat = _a.labelFormat;
-        var strMeasure = !["none", null, void 0].includes(numberFormat) && "number" === typeof measure ? Object(_grafana_data__WEBPACK_IMPORTED_MODULE_2__["getValueFormat"])(numberFormat)(measure, numberFormatDecimals, null) : measure;
+        var strMeasure = !["none", null, void 0].includes(numberFormat) && "number" === typeof measure ? Object(_grafana_data__WEBPACK_IMPORTED_MODULE_2__["getValueFormat"])(numberFormat)(measure, numberFormatDecimals, null).text : measure;
         var strFormat = (isForTooltip ? isCustom && (isForTitle ? titleFormat : labelFormat) : labelOptions.format) || defaultFormat;
         var strResult = strFormat.replace(/(\\\$)|\$\{(?:(series)|(category)|measure|col:((?:[^\\\}:]+|\\.)+)(?::([\-\w]+))?)\}/g, function (match, isEscapedDollar, isSeries, isCategory, colName, colFnName) {
           if (isEscapedDollar) {
@@ -12847,7 +12843,7 @@ function (_super) {
               userCallback: function userCallback(value, index, values) {
                 var numberFormat = panel.numberFormat,
                     numberFormatDecimals = panel.numberFormatDecimals;
-                return !["none", null, void 0].includes(numberFormat) && "number" === typeof value ? Object(_grafana_data__WEBPACK_IMPORTED_MODULE_2__["getValueFormat"])(numberFormat)(value, numberFormatDecimals, null) : value;
+                return !["none", null, void 0].includes(numberFormat) && "number" === typeof value ? Object(_grafana_data__WEBPACK_IMPORTED_MODULE_2__["getValueFormat"])(numberFormat)(value, numberFormatDecimals, null).text : value;
               }
             },
             stacked: true,
@@ -12865,7 +12861,7 @@ function (_super) {
               userCallback: function userCallback(value, index, values) {
                 var numberFormat = panel.numberFormat,
                     numberFormatDecimals = panel.numberFormatDecimals;
-                return !["none", null, void 0].includes(numberFormat) && "number" === typeof value ? Object(_grafana_data__WEBPACK_IMPORTED_MODULE_2__["getValueFormat"])(numberFormat)(value, numberFormatDecimals, null) : value;
+                return !["none", null, void 0].includes(numberFormat) && "number" === typeof value ? Object(_grafana_data__WEBPACK_IMPORTED_MODULE_2__["getValueFormat"])(numberFormat)(value, numberFormatDecimals, null).text : value;
               }
             },
             stacked: true,
@@ -13036,14 +13032,9 @@ function (_super) {
   };
 
   ChartJsPanelCtrl.prototype.link = function (scope, elem, attrs, ctrl) {
+    // console.log("link():", { scope, elem, attrs, ctrl });
     var _this = this;
 
-    console.log("link():", {
-      scope: scope,
-      elem: elem,
-      attrs: attrs,
-      ctrl: ctrl
-    });
     var panelElement = elem.find("grafana-panel > *:eq(0)");
     this.events.on(RENDER_NOW_EVENT, function (e) {
       return _this.drawChart.call(_this, e, panelElement);
